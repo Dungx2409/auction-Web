@@ -1,0 +1,15 @@
+<header class="account-header">
+  <h1>Tài khoản của tôi</h1>
+  <div class="user-card">
+    <h2>{{user.name}}</h2>
+    <p>Email: {{user.email}}</p>
+    {{#if user.ratingPlus}}
+      <p>Đánh giá: {{user.ratingPlus}} 👍 / {{user.ratingMinus}} 👎</p>
+    {{/if}}
+    <ul class="role-badges">
+      {{#each roles}}
+        <li class="role-badge role-{{this}}">{{this}}</li>
+      {{/each}}
+    </ul>
+  </div>
+</header>

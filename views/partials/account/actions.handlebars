@@ -1,0 +1,20 @@
+<div class="account-actions">
+  <a class="account-action {{#if (eq currentSection 'profile')}}is-active{{/if}}" href="/account/profile" data-account-tab data-target="profile">
+    <h3>Thông tin cá nhân</h3>
+    <p>Xem và cập nhật hồ sơ chi tiết của bạn.</p>
+  </a>
+  <a class="account-action {{#if (eq currentSection 'security')}}is-active{{/if}}" href="/account/security" data-account-tab data-target="security">
+    <h3>Bảo mật mật khẩu</h3>
+    <p>Tăng cường an toàn tài khoản, đổi mật khẩu định kỳ.</p>
+  </a>
+  <a class="account-action {{#if (eq currentSection 'products')}}is-active{{/if}} {{#unless isSeller}}is-disabled{{/unless}}" href="/account/products" data-account-tab data-target="products" {{#unless isSeller}}aria-disabled="true" tabindex="-1"{{/unless}}>
+    <h3>Quản lí sản phẩm</h3>
+    <p>Đăng bán, theo dõi các sản phẩm đang và đã đấu giá.</p>
+  </a>
+  {{#if isAdmin}}
+    <a class="account-action {{#if (eq currentSection 'admin')}}is-active{{/if}}" href="/account/admin" data-account-tab data-target="admin">
+      <h3>Bảng quản trị</h3>
+      <p>Giám sát danh mục, người dùng và sản phẩm mới nhất.</p>
+    </a>
+  {{/if}}
+</div>

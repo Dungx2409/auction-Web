@@ -1,0 +1,53 @@
+<section class="admin-dashboard">
+  <header class="account-header">
+    <h1>Bảng điều khiển quản trị</h1>
+    <div class="stats-strip">
+      <div><strong>{{stats.totalProducts}}</strong><span>Sản phẩm</span></div>
+      <div><strong>{{stats.totalCategories}}</strong><span>Danh mục con</span></div>
+      <div><strong>{{stats.totalUsers}}</strong><span>Người dùng</span></div>
+    </div>
+  </header>
+
+  <section class="account-section">
+    <h2>Danh mục</h2>
+    <div class="category-admin">
+      {{#each categories}}
+        <article>
+          <h3>{{name}}</h3>
+          <ul>
+            {{#each children}}
+              <li>{{name}}</li>
+            {{/each}}
+          </ul>
+        </article>
+      {{/each}}
+    </div>
+  </section>
+
+  <section class="account-section">
+    <h2>Người dùng</h2>
+    <table>
+      <thead>
+        <tr><th>Tên</th><th>Email</th><th>Vai trò</th></tr>
+      </thead>
+      <tbody>
+        {{#each users}}
+          <tr>
+            <td>{{name}}</td>
+            <td>{{email}}</td>
+            <td>{{role}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="account-section">
+    <h2>Sản phẩm gần đây</h2>
+    <div class="product-grid">
+      {{#each (slice products 0 8)}}
+        {{> product-card}}
+      {{/each}}
+    </div>
+  </section>
+</section>

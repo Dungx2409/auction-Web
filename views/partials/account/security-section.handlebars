@@ -1,0 +1,63 @@
+<section id="security" class="account-section account-security">
+  <header class="section-header">
+    <h2>Bảo mật &amp; mật khẩu</h2>
+    <p>Đặt lại mật khẩu tài khoản của bạn để tăng cường bảo mật.</p>
+  </header>
+
+  <div class="account-panel">
+    <div class="account-panel-main">
+      {{#if passwordFlash}}
+        <div class="alert alert-{{passwordFlash.type}}">{{passwordFlash.message}}</div>
+      {{/if}}
+
+      <form method="post" action="/account/password" class="account-form">
+        <div class="account-form-grid account-form-grid--password">
+          <div class="form-field {{#if passwordErrors.currentPassword}}has-error{{/if}}">
+            <label for="password-current">Mật khẩu hiện tại</label>
+            <div class="input-password">
+              <input id="password-current" type="password" name="currentPassword" value="{{passwordForm.currentPassword}}" required />
+              <button type="button" class="btn-toggle" data-toggle-password>Hiện</button>
+            </div>
+            {{#if passwordErrors.currentPassword}}<span class="field-error">{{passwordErrors.currentPassword}}</span>{{/if}}
+          </div>
+
+          <div class="form-field {{#if passwordErrors.newPassword}}has-error{{/if}}">
+            <label for="password-new">Mật khẩu mới</label>
+            <div class="input-password">
+              <input id="password-new" type="password" name="newPassword" value="{{passwordForm.newPassword}}" required data-password-source />
+              <button type="button" class="btn-toggle" data-toggle-password>Hiện</button>
+            </div>
+            <p class="field-hint">Tối thiểu 6 ký tự, nên bao gồm chữ hoa, chữ thường và số.</p>
+            <div class="password-strength" data-password-strength>Độ mạnh: —</div>
+            {{#if passwordErrors.newPassword}}<span class="field-error">{{passwordErrors.newPassword}}</span>{{/if}}
+          </div>
+
+          <div class="form-field {{#if passwordErrors.confirmPassword}}has-error{{/if}}">
+            <label for="password-confirm">Xác nhận mật khẩu mới</label>
+            <div class="input-password">
+              <input id="password-confirm" type="password" name="confirmPassword" value="{{passwordForm.confirmPassword}}" required />
+              <button type="button" class="btn-toggle" data-toggle-password>Hiện</button>
+            </div>
+            {{#if passwordErrors.confirmPassword}}<span class="field-error">{{passwordErrors.confirmPassword}}</span>{{/if}}
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn secondary">Cập nhật mật khẩu</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="account-panel-aside">
+      <div class="account-card account-card--tips">
+        <h3>Mẹo bảo mật</h3>
+        <ul class="account-info-list">
+          <li><span>2FA</span><strong>Kích hoạt xác thực 2 bước nếu khả dụng.</strong></li>
+          <li><span>Mật khẩu mạnh</span><strong>Sử dụng tối thiểu 12 ký tự với ký tự đặc biệt.</strong></li>
+          <li><span>Thiết bị</span><strong>Đăng xuất khỏi thiết bị lạ sau mỗi phiên.</strong></li>
+          <li><span>Thông báo</span><strong>Theo dõi email cảnh báo đăng nhập bất thường.</strong></li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</section>

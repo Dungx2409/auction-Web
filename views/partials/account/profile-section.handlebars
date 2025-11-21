@@ -1,0 +1,59 @@
+<section id="profile" class="account-section account-profile">
+  <header class="section-header">
+    <h2>Thông tin cá nhân</h2>
+    <p>Cập nhật thông tin liên hệ và tên hiển thị của bạn.</p>
+  </header>
+
+  <div class="account-panel">
+    <div class="account-panel-main">
+      {{#if profileFlash}}
+        <div class="alert alert-{{profileFlash.type}}">{{profileFlash.message}}</div>
+      {{/if}}
+
+      <form method="post" action="/account/profile" class="account-form">
+        <div class="account-form-grid">
+          <div class="form-field {{#if profileErrors.name}}has-error{{/if}}">
+            <label for="profile-name">Họ và tên</label>
+            <input id="profile-name" type="text" name="name" value="{{profileForm.name}}" required />
+            {{#if profileErrors.name}}<span class="field-error">{{profileErrors.name}}</span>{{/if}}
+        </div>
+
+          <div class="form-field">
+            <label for="profile-email">Email</label>
+            <input id="profile-email" type="email" value="{{profileForm.email}}" disabled />
+            <p class="field-hint">Email được sử dụng để đăng nhập và không thể thay đổi.</p>
+          </div>
+          <div class="form-field {{#if profileErrors.address}}has-error{{/if}}">
+            <label for="profile-address">Địa chỉ</label>
+            <textarea id="profile-address" name="address" rows="3">{{profileForm.address}}</textarea>
+            {{#if profileErrors.address}}<span class="field-error">{{profileErrors.address}}</span>{{/if}}
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn primary">Cập nhật thông tin</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="account-panel-aside">
+      <div class="account-card">
+        <h3>Hồ sơ của bạn</h3>
+        <ul class="account-info-list">
+          <li><span>Email</span><strong>{{user.email}}</strong></li>
+          <li><span>Địa chỉ</span><strong>{{#if user.address}}{{user.address}}{{else}}Chưa cập nhật{{/if}}</strong></li>
+          <li><span>Ngày tham gia</span><strong>{{formatDate user.createdAt 'DD/MM/YYYY'}}</strong></li>
+          <li><span>Vai trò</span>
+            <strong>
+              {{#if roles.length}}
+                {{#each roles}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+              {{else}}
+                thành viên
+              {{/if}}
+            </strong>
+          </li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</section>

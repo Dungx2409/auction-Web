@@ -1,0 +1,43 @@
+<section class="auth-wrapper">
+  <div class="auth-card">
+    <header>
+      <h1>Xác minh OTP</h1>
+      <p>Nhập mã OTP gồm 6 chữ số đã được gửi tới email <strong>{{email}}</strong>.</p>
+    </header>
+
+    {{#if flash}}
+      <div class="alert alert-{{flash.type}}">{{flash.message}}</div>
+    {{/if}}
+
+    <form class="auth-form" method="post" action="/auth/verify-otp" novalidate>
+      <input type="hidden" name="registrationId" value="{{registrationId}}" />
+
+      <div class="form-field {{#if errors.otp}}has-error{{/if}}">
+        <label for="otp">Mã OTP</label>
+        <input id="otp" name="otp" type="text" inputmode="numeric" placeholder="Nhập mã 6 số" maxlength="6" required />
+        {{#if errors.otp}}
+          <span class="field-error">{{errors.otp}}</span>
+        {{/if}}
+      </div>
+
+      {{#if expiresAt}}
+        <p class="field-hint">Mã sẽ hết hạn lúc {{formatDate expiresAt 'HH:mm:ss DD/MM/YYYY'}}.</p>
+      {{/if}}
+
+      <button class="btn primary w-100" type="submit">Hoàn tất đăng ký</button>
+    </form>
+
+    <footer>
+      <p>Không nhận được OTP? <a href="/auth/register">Đăng ký lại</a>.</p>
+    </footer>
+  </div>
+
+  <aside class="auth-aside">
+    <h2>Bảo vệ tài khoản</h2>
+    <ul>
+      <li>Chỉ nhập OTP trên trang chính thức của sàn đấu giá.</li>
+      <li>OTP có hiệu lực trong 10 phút kể từ khi nhận.</li>
+      <li>Nếu cần hỗ trợ, vui lòng liên hệ bộ phận chăm sóc khách hàng.</li>
+    </ul>
+  </aside>
+</section>

@@ -1,0 +1,114 @@
+<article class="product-detail">
+  <div class="gallery">
+    <img class="main" src="{{product.images.[0]}}" alt="{{product.title}}" />
+    <div class="thumbs">
+      {{#each product.images}}
+        <img src="{{this}}" alt="{{../product.title}} thumbnail" />
+      {{/each}}
+    </div>
+  </div>
+  <div class="info">
+    <h1>{{product.title}}</h1>
+    <div class="price-block">
+      <span class="price-current">{{formatCurrency product.currentPrice}}</span>
+      {{#if product.buyNowPrice}}
+        <span class="price-buy">Mua ngay {{formatCurrency product.buyNowPrice}}</span>
+      {{/if}}
+    </div>
+    <dl class="summary">
+      <div>
+        <dt>Người đang dẫn</dt>
+        <dd>{{maskName product.highestBidder.name}} ({{percent product.highestBidder.ratingPlus (add product.highestBidder.ratingPlus product.highestBidder.ratingMinus)}})</dd>
+      </div>
+      <div>
+        <dt>Lượt ra giá</dt>
+        <dd>{{product.bidCount}}</dd>
+      </div>
+      <div>
+        <dt>Yêu thích</dt>
+        <dd>{{product.watchers}}</dd>
+      </div>
+    </dl>
+
+    <div class="time-left" data-enddate="{{product.endDate}}">
+      Thời gian còn lại: <span class="countdown">--:--:--</span>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary">Đặt giá + {{formatCurrency product.bidStep}}</button>
+      <button class="btn secondary">Thêm vào Watchlist</button>
+      <button class="btn tertiary">Hỏi người bán</button>
+    </div>
+
+    <section class="seller-card">
+      <h3>Người bán {{product.seller.name}}</h3>
+      <ul>
+        <li>Đánh giá: {{product.seller.ratingPlus}} 👍 / {{product.seller.ratingMinus}} 👎 ({{product.seller.ratingScore}}%)</li>
+        <li>Phản hồi trong: {{product.seller.responseTime}}</li>
+        <li>Huy hiệu: {{#each product.seller.badges}}<span class="badge">{{this}}</span>{{/each}}</li>
+      </ul>
+    </section>
+
+    <section class="shipping">
+      <h3>Vận chuyển & thanh toán</h3>
+      <p><strong>Giao hàng:</strong> {{#each product.shippingOptions}}<span>{{this}}</span>{{#unless @last}}, {{/unless}}{{/each}}</p>
+      <p><strong>Thanh toán:</strong> {{#each product.paymentMethods}}<span>{{this}}</span>{{#unless @last}}, {{/unless}}{{/each}}</p>
+      <p><strong>Ngày đăng:</strong> {{formatDate product.startDate}} ({{relativeTime product.startDate}})</p>
+    </section>
+  </div>
+</article>
+
+<section class="product-description">
+  <h2>Thông tin sản phẩm</h2>
+  {{{product.description}}}
+  <h3>Tài liệu đính kèm</h3>
+  <ul class="documents">
+    {{#each product.documents}}
+      <li>{{this}}</li>
+    {{/each}}
+  </ul>
+</section>
+
+<section class="bid-history">
+  <h2>Lịch sử đấu giá</h2>
+  <table>
+    <thead>
+      <tr style="text-align: left;"><th>Thời điểm</th><th>Người mua</th><th>Giá</th></tr>
+    </thead>
+    <tbody>
+      {{#each product.bids}}
+        <tr>
+          <td>{{formatDate time}}</td>
+          <td>{{maskName userName}}</td>
+          <td>{{formatCurrency amount}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+
+<section class="qa-section">
+  <h2>Hỏi & đáp</h2>
+  {{#each product.questions}}
+    <article class="qa-item">
+      <header>
+        <strong>{{maskName askedBy}}</strong>
+        <span class="time">{{relativeTime askedAt}}</span>
+      </header>
+      <p class="question">{{question}}</p>
+      <strong>Phản hồi của người bán:</strong>
+      <p class="answer" style="opacity: 0.5;">{{answer}}</p>
+    </article>
+  {{/each}}
+</section>
+
+{{#if relatedProducts.length}}
+  <section class="related-products">
+    <h2>Sản phẩm cùng danh mục</h2>
+    <div class="product-grid">
+      {{#each relatedProducts}}
+        {{> product-card}}
+      {{/each}}
+    </div>
+  </section>
+{{/if}}

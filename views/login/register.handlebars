@@ -1,0 +1,94 @@
+<section class="auth-wrapper">
+  <div class="auth-card">
+    <header>
+      <h1>Đăng ký tài khoản</h1>
+      <p>Tạo tài khoản Bidder để tham gia đấu giá, quản lý watchlist và nâng cấp trở thành người bán.</p>
+    </header>
+
+    {{#if flash}}
+      <div class="alert alert-{{flash.type}}">{{flash.message}}</div>
+    {{/if}}
+
+    <form class="auth-form" method="post" novalidate>
+      <div class="form-field {{#if errors.name}}has-error{{/if}}">
+        <label for="name">Họ và tên</label>
+        <input id="name" name="name" type="text" placeholder="VD: Nguyễn Văn A" value="{{form.name}}" required />
+        {{#if errors.name}}
+          <span class="field-error">{{errors.name}}</span>
+        {{/if}}
+      </div>
+
+      <div class="form-field {{#if errors.email}}has-error{{/if}}">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="you@example.com" value="{{form.email}}" required />
+        {{#if errors.email}}
+          <span class="field-error">{{errors.email}}</span>
+        {{/if}}
+      </div>
+
+      <div class="form-field {{#if errors.address}}has-error{{/if}}">
+        <label for="address">Địa chỉ</label>
+        <textarea id="address" name="address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành" rows="3" required>{{form.address}}</textarea>
+        {{#if errors.address}}
+          <span class="field-error">{{errors.address}}</span>
+        {{/if}}
+      </div>
+
+      <div class="form-field {{#if errors.password}}has-error{{/if}}">
+        <label for="regPassword">Mật khẩu</label>
+        <input id="regPassword" name="password" type="password" placeholder="••••••" required />
+        {{#if errors.password}}
+          <span class="field-error">{{errors.password}}</span>
+        {{/if}}
+      </div>
+
+      <div class="form-field {{#if errors.confirmPassword}}has-error{{/if}}">
+        <label for="confirmPassword">Xác nhận mật khẩu</label>
+        <input id="confirmPassword" name="confirmPassword" type="password" placeholder="Nhập lại mật khẩu" required />
+        {{#if errors.confirmPassword}}
+          <span class="field-error">{{errors.confirmPassword}}</span>
+        {{/if}}
+      </div>
+
+      <div class="form-field {{#if errors.recaptcha}}has-error{{/if}}">
+        {{#if config.recaptchaSiteKey}}
+          <div class="g-recaptcha" data-sitekey="{{config.recaptchaSiteKey}}"></div>
+        {{else}}
+          <p class="field-hint">Thiếu reCAPTCHA site key. Trong môi trường demo, nhập mã "test-pass" vào trường reCAPTCHA ảo bên dưới.</p>
+          <input type="text" name="g-recaptcha-response" placeholder="test-pass" />
+        {{/if}}
+        {{#if errors.recaptcha}}
+          <span class="field-error">{{errors.recaptcha}}</span>
+        {{/if}}
+      </div>
+
+      <button class="btn primary w-100" type="submit">Tạo tài khoản</button>
+    </form>
+
+    <footer>
+      <p>Đã có tài khoản? <a href="/auth/login" style="color: blue;">Đăng nhập</a>.</p>
+    </footer>
+  </div>
+
+  <aside class="auth-aside">
+    <h2>Lợi ích dành cho thành viên</h2>
+    <ul>
+      <li>Theo dõi sản phẩm và nhận thông báo khi gần kết thúc.</li>
+      <li>Đặt giá nhanh chóng, gia hạn phiên đấu giá và quản lý lịch sử.</li>
+      <li>Nâng cấp lên người bán chỉ với vài thao tác và danh mục rõ ràng.</li>
+    </ul>
+
+    <div class="tips">
+      <h3>Hướng dẫn bảo mật</h3>
+      <ul>
+        <li>Sử dụng mật khẩu mạnh (ít nhất 6 ký tự, bao gồm chữ và số).</li>
+        <li>Không chia sẻ mã OTP cho bất kỳ ai.</li>
+        <li>Liên hệ hỗ trợ nếu bạn không nhận được email xác thực.</li>
+      </ul>
+    </div>
+  </aside>
+</section>
+
+{{#if config.recaptchaSiteKey}}
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{{/if}}

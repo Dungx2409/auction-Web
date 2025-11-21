@@ -1,0 +1,21 @@
+<nav class="category-sidebar" data-category-sidebar>
+  <button class="category-toggle" type="button" data-action="toggle-sidebar">
+    <span>Danh mục</span>
+    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16v2H4zm0 6h16v2H4z"/></svg>
+  </button>
+
+  <ul class="category-list">
+    {{#each categories}}
+      <li class="category-item{{#if children}} has-children{{/if}}">
+        <a class="category-link" href="/products?category={{id}}">{{name}}</a>
+        {{#if children}}
+          <ul class="subcategory-list">
+            {{#each children}}
+              <li><a href="/products/category/{{id}}">{{name}}</a></li>
+            {{/each}}
+          </ul>
+        {{/if}}
+      </li>
+    {{/each}}
+  </ul>
+</nav>

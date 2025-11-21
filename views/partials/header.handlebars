@@ -1,0 +1,32 @@
+<header class="site-header">
+  <div class="topbar container">
+    <div class="brand"><a href="/">Sàn Đấu Giá</a></div>
+    <form class="search-bar" action="/search" method="get">
+      <input type="text" name="q" placeholder="Tìm kiếm sản phẩm, danh mục..." value="{{query}}" />
+      <button type="submit">Tìm</button>
+    </form>
+    <nav class="main-nav">
+      <a href="/">Trang chủ</a>
+      <a href="/products">Sản phẩm</a>
+      <div class="nav-account">
+        <a href="/account" class="nav-account-trigger">
+          <span class="nav-account-label">Tài khoản</span>
+          {{#if currentUser}}
+            <span class="nav-account-name">{{currentUser.name}}</span>
+          {{/if}}
+        </a>
+        <div class="nav-account-menu">
+          <a href="/account#profile">Thông tin cá nhân</a>
+          <a href="/account#security">Bảo mật mật khẩu</a>
+          <a href="/account#products">Quản lí sản phẩm</a>
+        </div>
+      </div>
+      {{#if currentUser}}
+        <a class="btn-login" href="/auth/logout">Đăng xuất</a>
+      {{else}}
+        <a class="btn-secondary" href="/auth/register">Đăng ký</a>
+        <a class="btn-login" href="/auth/login">Đăng nhập</a>
+      {{/if}}
+    </nav>
+  </div>
+</header>

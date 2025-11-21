@@ -1,0 +1,9 @@
+<section class="account">
+  {{> account/header user=user roles=roles}}
+
+  {{> account/nav currentSection='profile' isSeller=isSeller isAdmin=isAdmin}}
+
+  {{> account/actions currentSection='profile' isSeller=isSeller}}
+
+  {{> account/profile-section}}
+</section>

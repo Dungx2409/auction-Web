@@ -1,0 +1,37 @@
+<section class="page-heading">
+  <h1>Danh sách sản phẩm</h1>
+  {{#if category}}
+    <p>Danh mục: {{category.name}} {{#if category.parent}}(Thuộc {{category.parent.name}}){{/if}}</p>
+  {{/if}}
+  <p>Tìm thấy {{total}} sản phẩm.</p>
+</section>
+
+<form class="filter-bar" method="get">
+  {{#if categoryId}}
+    <input type="hidden" name="category" value="{{categoryId}}" />
+  {{/if}}
+  <label>Sắp xếp
+    <select name="sort" onchange="this.form.submit()">
+      <option value="endingSoon" {{#if (eq sort 'endingSoon')}}selected{{/if}}>Kết thúc sớm nhất</option>
+      <option value="priceAsc" {{#if (eq sort 'priceAsc')}}selected{{/if}}>Giá tăng dần</option>
+      <option value="priceDesc" {{#if (eq sort 'priceDesc')}}selected{{/if}}>Giá giảm dần</option>
+      <option value="newest" {{#if (eq sort 'newest')}}selected{{/if}}>Mới đăng</option>
+    </select>
+  </label>
+</form>
+
+<div class="product-grid">
+  {{#each products}}
+    {{> product-card}}
+  {{/each}}
+</div>
+
+<div class="pagination">
+  {{#if (gt page 1)}}
+    <a href="?page={{subtract page 1}}&sort={{sort}}{{#if categoryId}}&category={{categoryId}}{{/if}}">← Trang trước</a>
+  {{/if}}
+  <span>Trang {{page}} / {{totalPages}}</span>
+  {{#if (lt page totalPages)}}
+    <a href="?page={{add page 1}}&sort={{sort}}{{#if categoryId}}&category={{categoryId}}{{/if}}">Trang tiếp →</a>
+  {{/if}}
+</div>

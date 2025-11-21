@@ -1,0 +1,18 @@
+<section class="account">
+  {{> account/header user=user roles=roles}}
+
+  {{> account/nav currentSection='admin' isSeller=isSeller isAdmin=isAdmin}}
+
+  {{> account/actions currentSection='admin' isSeller=isSeller}}
+
+  {{#if isAdmin}}
+    {{> account/admin-section admin=admin}}
+  {{else}}
+    <section class="account-section account-section--disabled">
+      <header class="section-header">
+        <h2>Bảng điều khiển quản trị</h2>
+        <p>Bạn cần quyền quản trị để truy cập khu vực này.</p>
+      </header>
+    </section>
+  {{/if}}
+</section>

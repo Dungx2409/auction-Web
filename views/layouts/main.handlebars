@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Online Auction - PTUDW</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body class="{{#if showCategorySidebar}}has-category-sidebar{{else}}no-category-sidebar{{/if}}">
+    {{> header}}
+
+    <div class="layout-shell{{#unless showCategorySidebar}} layout-shell--no-sidebar{{/unless}}">
+      {{#if showCategorySidebar}}
+        {{> category-menu categories=site.categories}}
+      {{/if}}
+
+      <main class="container">
+        {{{body}}}
+      </main>
+    </div>
+
+    {{> footer}}
+
+    <script src="/js/main.js"></script>
+  </body>
+</html>

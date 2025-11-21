@@ -1,0 +1,57 @@
+<section class="hero">
+  <div class="hero-content">
+    <h1>{{hero.title}}</h1>
+    <p>{{hero.subtitle}}</p>
+    <form action="/search" class="hero-search" method="get">
+      <input type="text" name="q" placeholder="Từ khóa: iPhone 15, MacBook, đồng hồ,..." />
+      <button type="submit">Tìm ngay</button>
+    </form>
+    <ul class="hero-features">
+      <li>Top 5 sản phẩm cập nhật theo thời gian.</li>
+      <li>Đấu giá tự động, gia hạn khi có lượt bid cuối.</li>
+      <li>Quản trị, bidder, seller đầy đủ tính năng.</li>
+    </ul>
+  </div>
+  <aside class="hero-stats">
+    <div><strong>{{site.categories.length}}</strong><span>Nhóm danh mục</span></div>
+    <div><strong>{{endingSoon.length}}</strong><span>Phiên sắp kết thúc</span></div>
+    <div><strong>{{mostBids.length}}</strong><span>Đang đấu sôi nổi</span></div>
+  </aside>
+</section>
+
+<section class="home-section">
+  <header class="section-header">
+    <h2>Top 5 sắp kết thúc</h2>
+    <a href="/products?sort=endingSoon">Xem tất cả</a>
+  </header>
+  <div class="product-grid">
+    {{#each endingSoon}}
+      {{> product-card}}
+    {{/each}}
+  </div>
+</section>
+
+<section class="home-section">
+  <header class="section-header">
+    <h2>Top 5 nhiều lượt đấu giá</h2>
+    <a href="/products?sort=endingSoon">Xem danh mục</a>
+  </header>
+  <div class="product-grid">
+    {{#each mostBids}}
+      {{> product-card}}
+    {{/each}}
+  </div>
+</section>
+
+<section class="home-section">
+  <header class="section-header">
+    <h2>Top 5 giá cao nhất</h2>
+    <a href="/products?sort=priceDesc">Sắp xếp giá cao → thấp</a>
+  </header>
+  <div class="product-grid">
+    {{#each highestPrice}}
+      {{> product-card}}
+    {{/each}}
+  </div>
+</section>
+

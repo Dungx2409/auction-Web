@@ -1,0 +1,47 @@
+<section class="account-section">
+  <h2>Watchlist của tôi</h2>
+  {{#if bidder.watchlist.length}}
+    <div class="product-grid">
+      {{#each bidder.watchlist}}
+        {{> product-card product}}
+      {{/each}}
+    </div>
+  {{else}}
+    <p>Chưa có sản phẩm nào trong danh sách theo dõi.</p>
+  {{/if}}
+</section>
+
+<section class="account-section">
+  <h2>Đang tham gia đấu giá</h2>
+  {{#if bidder.activeBids.length}}
+    <div class="product-grid">
+      {{#each bidder.activeBids}}
+        {{> product-card}}
+      {{/each}}
+    </div>
+  {{else}}
+    <p>Bạn chưa tham gia phiên đấu giá nào.</p>
+  {{/if}}
+</section>
+
+<section class="account-section">
+  <h2>Sản phẩm đã thắng</h2>
+  {{#if bidder.wins.length}}
+    <div class="product-grid">
+      {{#each bidder.wins}}
+        {{> product-card}}
+      {{/each}}
+    </div>
+  {{else}}
+    <p>Hãy tiếp tục đấu giá để trở thành người chiến thắng.</p>
+  {{/if}}
+</section>
+
+<section class="account-section">
+  <h2>Gợi ý dành riêng cho bạn</h2>
+  <div class="product-grid">
+    {{#each bidder.recommended}}
+      {{> product-card}}
+    {{/each}}
+  </div>
+</section>

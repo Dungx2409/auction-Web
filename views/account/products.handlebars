@@ -1,0 +1,13 @@
+<section class="account">
+  {{> account/header user=user roles=roles}}
+
+  {{> account/nav currentSection='products' isSeller=isSeller isAdmin=isAdmin}}
+
+  {{> account/actions currentSection='products' isSeller=isSeller}}
+
+  {{#if isSeller}}
+    {{> account/seller-dashboard seller=seller}}
+  {{else}}
+    {{> account/seller-locked}}
+  {{/if}}
+</section>

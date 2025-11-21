@@ -1,0 +1,42 @@
+<article class="product-card">
+  <a class="product-link" href="/products/{{id}}">
+    <figure class="product-thumb">
+      <img src="{{images.[0]}}" alt="{{title}}" loading="lazy" />
+      {{#if autoExtend}}
+        <span class="badge badge-auto">Gia hạn tự động</span>
+      {{/if}}
+    </figure>
+    <div class="product-body">
+      <h3>{{title}}</h3>
+      <p class="product-summary">{{summary}}</p>
+      <dl class="product-meta">
+        <div>
+          <dt>Giá hiện tại</dt>
+          <dd>{{formatCurrency currentPrice}}</dd>
+        </div>
+        <div>
+          <dt>Bước giá</dt>
+          <dd>{{formatCurrency bidStep}}</dd>
+        </div>
+        <div>
+          <dt>Kết thúc</dt>
+          <dd>{{relativeTime endDate}}</dd>
+        </div>
+      </dl>
+    </div>
+  </a>
+  <footer class="product-footer">
+    <div>
+      <span class="label">Lượt ra giá:</span>
+      <span>{{bidCount}}</span>
+    </div>
+    <div>
+      <span class="label">Đang thắng:</span>
+      <span>{{maskName highestBidder.name}}</span>
+    </div>
+    <div>
+      <span class="label">Yêu thích:</span>
+      <span>{{watchers}}</span>
+    </div>
+  </footer>
+</article>

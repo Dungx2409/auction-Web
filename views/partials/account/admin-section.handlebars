@@ -1,0 +1,137 @@
+<section class="account-section account-admin" data-admin-dashboard data-current-user-id="{{user.id}}">
+  <header class="section-header">
+    <h2>Bảng điều khiển quản trị</h2>
+    <div class="stats-strip">
+      <div><strong>{{admin.stats.totalProducts}}</strong><span> Sản phẩm</span></div>
+      <div><strong>{{admin.stats.totalCategories}}</strong><span> Danh mục con</span></div>
+      <div><strong>{{admin.stats.totalUsers}}</strong><span> Người dùng</span></div>
+    </div>
+  </header>
+
+  <div class="admin-management" data-admin-management>
+    <div class="admin-users-panel">
+      <div class="admin-user-filters" data-admin-filter-group>
+        <button type="button" class="admin-user-filter is-active" data-admin-filter="all">Tất cả ({{admin.userCounts.all}})</button>
+        <button type="button" class="admin-user-filter" data-admin-filter="admin">Admin ({{admin.userCounts.admin}})</button>
+        <button type="button" class="admin-user-filter" data-admin-filter="seller">Seller ({{admin.userCounts.seller}})</button>
+        <button type="button" class="admin-user-filter" data-admin-filter="bidder">Bidder ({{admin.userCounts.bidder}})</button>
+      </div>
+
+      <div class="admin-user-table-wrapper">
+        <table class="admin-user-table" data-admin-user-table>
+          <thead>
+            <tr>
+              <th>Tên</th>
+              <th>Email</th>
+              <th>Vai trò</th>
+              <th>Trạng thái</th>
+              <th>Ngày tham gia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each admin.users}}
+              <tr
+                class="admin-user-row{{#if (eq status 'banned')}} is-banned{{/if}}"
+                data-admin-user
+                data-user-id="{{id}}"
+                data-role="{{role}}"
+                data-user-name="{{name}}"
+                data-user-email="{{email}}"
+                data-user-role-label="{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}"
+                data-user-status="{{status}}"
+                tabindex="0"
+              >
+                <td>
+                  <span class="admin-user-name">{{name}}</span>
+                  <span class="admin-user-badge role-{{role}}">{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}</span>
+                </td>
+                <td>{{email}}</td>
+                <td>{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}</td>
+                <td>
+                  <span class="admin-user-status admin-user-status--{{status}}">
+                    {{#if (eq status 'banned')}}
+                      Đã khóa
+                    {{else}}
+                      {{#if (eq status 'pending')}}
+                        Đang chờ duyệt
+                      {{else}}
+                        Đang hoạt động
+                      {{/if}}
+                    {{/if}}
+                  </span>
+                </td>
+                <td>{{formatDate createdAt 'DD/MM/YYYY'}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-user-detail" data-admin-user-detail hidden>
+      <div class="admin-user-summary">
+        <div>
+          <h3 data-admin-user-name>Chọn người dùng</h3>
+          <p data-admin-user-email>—</p>
+        </div>
+        <div class="admin-user-tags">
+          <span class="role-badge" data-admin-user-role>—</span>
+          <span class="status-badge" data-admin-user-status>—</span>
+        </div>
+      </div>
+      <div class="admin-user-actions" data-admin-user-actions hidden>
+        <button type="button" class="btn-secondary" data-admin-user-ban>Khoá tài khoản</button>
+        <button type="button" class="btn-secondary" data-admin-user-unban hidden>Mở khoá tài khoản</button>
+      </div>
+      <p class="admin-user-placeholder" data-admin-user-placeholder>
+        Chọn một người dùng để xem chi tiết và quản lý hoạt động của họ.
+      </p>
+      <div class="admin-user-products" data-admin-user-products hidden>
+        <div class="admin-user-products-header">
+          <h4 data-admin-user-products-title>Quản lí hoạt động</h4>
+          <p data-admin-user-products-description>Gỡ sản phẩm vi phạm để dừng hiển thị trên sàn đấu giá.</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Sản phẩm</th>
+              <th>Trạng thái</th>
+              <th>Giá hiện tại</th>
+              <th>Lượt đấu</th>
+              <th>Kết thúc</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody data-admin-user-products-body></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-secondary">
+    <section>
+      <h3>Danh mục</h3>
+      <div class="category-admin">
+        {{#each admin.categories}}
+          <article>
+            <h4>{{name}}</h4>
+            <ul>
+              {{#each children}}
+                <li>{{name}}</li>
+              {{/each}}
+            </ul>
+          </article>
+        {{/each}}
+      </div>
+    </section>
+
+    <section>
+      <h3>Sản phẩm gần đây</h3>
+      <div class="product-grid">
+        {{#each admin.recentProducts}}
+          {{> product-card}}
+        {{/each}}
+      </div>
+    </section>
+  </div>
+</section>

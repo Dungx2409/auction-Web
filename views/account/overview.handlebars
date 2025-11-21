@@ -1,0 +1,35 @@
+<section class="account">
+  {{> account/header user=user roles=roles}}
+
+  {{> account/nav currentSection=activeSection isSeller=isSeller isAdmin=isAdmin}}
+
+  {{> account/actions currentSection=activeSection isSeller=isSeller isAdmin=isAdmin}}
+
+  <div class="account-sections" data-account-sections data-active-section="{{activeSection}}">
+    <div id="account-panel-profile" class="account-section-panel {{#unless (eq activeSection 'profile')}}is-hidden{{/unless}}" data-account-section="profile" role="tabpanel" {{#unless (eq activeSection 'profile')}}hidden{{/unless}}>
+      {{> account/profile-section}}
+    </div>
+
+    <div id="account-panel-security" class="account-section-panel {{#unless (eq activeSection 'security')}}is-hidden{{/unless}}" data-account-section="security" role="tabpanel" {{#unless (eq activeSection 'security')}}hidden{{/unless}}>
+      {{> account/security-section}}
+    </div>
+
+    <div id="account-panel-products" class="account-section-panel {{#unless (eq activeSection 'products')}}is-hidden{{/unless}}" data-account-section="products" role="tabpanel" {{#unless (eq activeSection 'products')}}hidden{{/unless}}>
+      {{#if isSeller}}
+        {{> account/seller-dashboard seller=seller}}
+      {{else}}
+        {{> account/seller-locked}}
+      {{/if}}
+
+      {{#if isBidder}}
+        {{> account/bidder-section bidder=bidder}}
+      {{/if}}
+    </div>
+
+    {{#if isAdmin}}
+      <div id="account-panel-admin" class="account-section-panel {{#unless (eq activeSection 'admin')}}is-hidden{{/unless}}" data-account-section="admin" role="tabpanel" {{#unless (eq activeSection 'admin')}}hidden{{/unless}}>
+        {{> account/admin-section admin=admin}}
+      </div>
+    {{/if}}
+  </div>
+</section>
