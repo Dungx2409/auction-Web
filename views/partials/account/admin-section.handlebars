@@ -50,12 +50,12 @@
                 <td>
                   <span class="admin-user-status admin-user-status--{{status}}">
                     {{#if (eq status 'banned')}}
-                      Đã khóa
+                      Locked
                     {{else}}
                       {{#if (eq status 'pending')}}
-                        Đang chờ duyệt
+                        Pending approval
                       {{else}}
-                        Đang hoạt động
+                        Active
                       {{/if}}
                     {{/if}}
                   </span>
@@ -106,32 +106,5 @@
         </table>
       </div>
     </div>
-  </div>
-
-  <div class="admin-secondary">
-    <section>
-      <h3>Danh mục</h3>
-      <div class="category-admin">
-        {{#each admin.categories}}
-          <article>
-            <h4>{{name}}</h4>
-            <ul>
-              {{#each children}}
-                <li>{{name}}</li>
-              {{/each}}
-            </ul>
-          </article>
-        {{/each}}
-      </div>
-    </section>
-
-    <section>
-      <h3>Sản phẩm gần đây</h3>
-      <div class="product-grid">
-        {{#each admin.recentProducts}}
-          {{> product-card}}
-        {{/each}}
-      </div>
-    </section>
   </div>
 </section>

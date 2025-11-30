@@ -4,7 +4,7 @@
       <p class="eyebrow">Hoàn tất đơn hàng</p>
       <h1>{{product.title}}</h1>
       <p>
-        Người bán: <strong>{{product.seller.name}}</strong> · Giá thắng: <strong>{{formatCurrency product.currentPrice}}</strong>
+        Người bán: <strong>{{ product.seller.name}}</strong> · Giá thắng: <strong>{{formatCurrency product.currentPrice}}</strong>
       </p>
       <p class="status-pill status-pill--ended">Phiên đấu giá đã kết thúc</p>
     </div>
@@ -20,7 +20,7 @@
         </div>
         <div>
           <dt>Trạng thái đơn hàng</dt>
-          <dd class="order-status order-status--{{fulfillment.order.status}}">{{fulfillment.order.status}}</dd>
+          <dd class="order-status order-status--{{fulfillment.order.status}}">{{localizeFulfillmentStatus fulfillment.order.status}}</dd>
         </div>
       </dl>
     </div>
@@ -56,7 +56,7 @@
     <div class="fulfillment-column">
       <section class="fulfillment-card" id="step-payment">
         <header>
-          <h2>1. Thông tin thanh toán & giao hàng</h2>
+          <h2>1. Thông tin thanh toán và giao hàng</h2>
           <p>Người thắng đấu giá cần cung cấp thông tin chi tiết.</p>
         </header>
         {{#if fulfillment.canSubmitPayment}}

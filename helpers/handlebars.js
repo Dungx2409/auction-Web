@@ -4,10 +4,12 @@ const relativeTime = require('dayjs/plugin/relativeTime');
 dayjs.extend(relativeTime);
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN', {
-  style: 'currency',
-  currency: 'VND',
-  maximumFractionDigits: 0,
+	style: 'currency',
+	currency: 'VND',
+	maximumFractionDigits: 0,
 });
+
+const { ORDER_STATUS_LABELS } = require('../services/dataService');
 
 module.exports = {
   formatCurrency(value) {
@@ -86,5 +88,9 @@ module.exports = {
     const text = String(value).trim();
     if (!text) return '?';
     return text.charAt(0).toUpperCase();
+  },
+  localizeFulfillmentStatus(status) {
+	const key = String(status || '').toLowerCase();
+	return ORDER_STATUS_LABELS[key] || status || 'Không xác định';
   },
 };

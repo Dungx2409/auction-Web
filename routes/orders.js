@@ -5,6 +5,22 @@ const dataService = require('../services/dataService');
 
 const router = express.Router();
 
+const ORDER_ERROR_MESSAGES = {
+  ORDER_PAYMENT_DETAILS_REQUIRED: 'Vui lòng nhập phương thức thanh toán và địa chỉ giao hàng.',
+  ORDER_INVALID_STATE: 'Trạng thái đơn hàng không hợp lệ cho thao tác này.',
+  ORDER_FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+  ORDER_NOT_FOUND: 'Đơn hàng không tồn tại hoặc đã bị xoá.',
+};
+
+function resolveOrderErrorMessage(error, fallback) {
+  if (!error) return fallback;
+  const key = String(error.code || error.message || '').toUpperCase();
+  if (key && ORDER_ERROR_MESSAGES[key]) {
+    return ORDER_ERROR_MESSAGES[key];
+  }
+  return fallback;
+}
+
 function ensureAuthenticated(req, res, next) {
   if (req.currentUser?.id) {
     return next();
@@ -80,12 +96,13 @@ router.post(
         note,
       });
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillSuccess: 'Đã gửi thông tin thanh toán. Chờ người bán xác nhận.',
+        fulfillSuccess: 'Đã gửi thông tin thanh toán, chờ người bán xác nhận.',
       });
     } catch (error) {
       console.error('[orders] payment-details error', error);
+      const message = resolveOrderErrorMessage(error, 'Không thể gửi thông tin thanh toán. Vui lòng thử lại.');
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillError: 'Không thể gửi thông tin thanh toán. Vui lòng thử lại.',
+        fulfillError: message,
       });
     }
   }
@@ -112,8 +129,9 @@ router.post(
       });
     } catch (error) {
       console.error('[orders] payment-confirmation error', error);
+      const message = resolveOrderErrorMessage(error, 'Không thể xác nhận thanh toán hoặc vận chuyển. Thử lại sau.');
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillError: 'Không thể xác nhận thanh toán hoặc vận chuyển. Thử lại sau.',
+        fulfillError: message,
       });
     }
   }
@@ -135,8 +153,9 @@ router.post(
       });
     } catch (error) {
       console.error('[orders] delivery-confirmation error', error);
+      const message = resolveOrderErrorMessage(error, 'Không thể xác nhận nhận hàng. Vui lòng thử lại.');
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillError: 'Không thể xác nhận nhận hàng. Vui lòng thử lại.',
+        fulfillError: message,
       });
     }
   }
@@ -160,8 +179,9 @@ router.post(
       });
     } catch (error) {
       console.error('[orders] cancel error', error);
+      const message = resolveOrderErrorMessage(error, 'Không thể huỷ giao dịch ở trạng thái hiện tại.');
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillError: 'Không thể huỷ giao dịch ở trạng thái hiện tại.',
+        fulfillError: message,
       });
     }
   }
@@ -193,8 +213,9 @@ router.post(
       });
     } catch (error) {
       console.error('[orders] feedback error', error);
+      const message = resolveOrderErrorMessage(error, 'Không thể lưu đánh giá. Kiểm tra lại thông tin.');
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillError: 'Không thể lưu đánh giá. Kiểm tra lại thông tin.',
+        fulfillError: message,
       });
     }
   }
@@ -218,8 +239,9 @@ router.post(
       });
     } catch (error) {
       console.error('[orders] chat error', error);
+      const message = resolveOrderErrorMessage(error, 'Không thể gửi tin nhắn. Thử lại.');
       return redirectToFulfillment(res, req.orderContext, {
-        fulfillError: 'Không thể gửi tin nhắn. Thử lại.',
+        fulfillError: message,
       });
     }
   }

@@ -18,6 +18,18 @@ const ORDER_STATUS_FLOW = [
   ORDER_STATUSES.TRANSACTION_COMPLETED,
 ];
 
+const ORDER_STATUS_LABELS = {
+	[ORDER_STATUSES.AWAITING_PAYMENT_DETAILS]: 'Chờ thông tin thanh toán',
+	[ORDER_STATUSES.PAYMENT_CONFIRMED_AWAITING_DELIVERY]: 'Người bán đang gửi hàng',
+	[ORDER_STATUSES.DELIVERY_CONFIRMED_READY_TO_RATE]: 'Chờ đánh giá',
+	[ORDER_STATUSES.TRANSACTION_COMPLETED]: 'Giao dịch hoàn tất',
+	[ORDER_STATUSES.CANCELED_BY_SELLER]: 'Đã huỷ bởi người bán',
+};
+
+function translateOrderStatus(status) {
+	return ORDER_STATUS_LABELS[status] || 'Không xác định';
+}
+
 const ORDER_CANCELABLE_STATUSES = new Set([
   ORDER_STATUSES.AWAITING_PAYMENT_DETAILS,
   ORDER_STATUSES.PAYMENT_CONFIRMED_AWAITING_DELIVERY,
@@ -28,6 +40,8 @@ const DEFAULT_CHAT_HISTORY_LIMIT = 50;
 
 let categoryTreeCache = null;
 let categoryMapCache = null;
+let orderStatusEnumEnsured = false;
+let orderWorkflowSchemaEnsured = false;
 
 function toNumber(value) {
   if (value == null) return null;
@@ -79,6 +93,39 @@ async function ensureCategoryCache() {
   }));
 
   categoryMapCache = map;
+}
+
+async function ensureOrderStatusEnumValues() {
+  if (orderStatusEnumEnsured) return;
+  const db = getKnex();
+  for (const status of Object.values(ORDER_STATUSES)) {
+    const sql = `DO $$
+BEGIN
+  BEGIN
+    ALTER TYPE order_status ADD VALUE '${status}';
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+  END;
+END
+$$;`;
+    await db.raw(sql);
+  }
+  orderStatusEnumEnsured = true;
+}
+
+async function ensureOrderWorkflowSchema() {
+  if (orderWorkflowSchemaEnsured) return;
+  const db = getKnex();
+  const statements = [
+    'ALTER TABLE IF EXISTS order_invoices ADD COLUMN IF NOT EXISTS payment_method TEXT',
+    'ALTER TABLE IF EXISTS order_invoices ADD COLUMN IF NOT EXISTS note TEXT',
+    'ALTER TABLE IF EXISTS order_shipments ADD COLUMN IF NOT EXISTS carrier TEXT',
+    'ALTER TABLE IF EXISTS order_shipments ADD COLUMN IF NOT EXISTS invoice_url TEXT',
+  ];
+  for (const statement of statements) {
+    await db.raw(statement);
+  }
+  orderWorkflowSchemaEnsured = true;
 }
 
 function buildCategoryPath(categoryId) {
@@ -1097,6 +1144,7 @@ async function ensureOrderForProduct(product, { chatLimit } = {}) {
   if (!buyerId) {
     return null;
   }
+  await ensureOrderStatusEnumValues();
   const db = getKnex();
   return db.transaction(async (trx) => {
     let orderRow = await getOrderRowByProduct(product.id, trx);
@@ -1131,6 +1179,7 @@ async function submitOrderPaymentDetails({
   if (!orderId || !buyerId) {
     throw new Error('ORDER_PAYMENT_INVALID_INPUT');
   }
+  await ensureOrderStatusEnumValues();
   const db = getKnex();
   const trimmedPaymentMethod = (paymentMethod || '').trim();
   const trimmedBilling = (billingAddress || '').trim();
@@ -1175,6 +1224,7 @@ async function sellerConfirmPaymentAndShipment({
   if (!orderId || !sellerId) {
     throw new Error('ORDER_SHIPMENT_INVALID_INPUT');
   }
+  await ensureOrderStatusEnumValues();
   const db = getKnex();
   return db.transaction(async (trx) => {
     const order = await trx('orders').where({ id: orderId }).forUpdate().first();
@@ -1205,6 +1255,7 @@ async function buyerConfirmDelivery({ orderId, buyerId }) {
   if (!orderId || !buyerId) {
     throw new Error('ORDER_DELIVERY_INVALID_INPUT');
   }
+  await ensureOrderStatusEnumValues();
   const db = getKnex();
   return db.transaction(async (trx) => {
     const order = await trx('orders').where({ id: orderId }).forUpdate().first();
@@ -1290,6 +1341,7 @@ async function cancelOrderBySeller({ orderId, sellerId, reason }) {
   if (!orderId || !sellerId) {
     throw new Error('ORDER_CANCEL_INVALID_INPUT');
   }
+  await ensureOrderStatusEnumValues();
   const db = getKnex();
   return db.transaction(async (trx) => {
     const order = await trx('orders').where({ id: orderId }).forUpdate().first();
@@ -1330,19 +1382,19 @@ function getOrderWorkflowMetadata() {
   return [
     {
       id: 'payment',
-      title: 'Cung cấp thông tin thanh toán & giao hàng',
+      title: 'Cung cấp thông tin thanh toán và giao hàng',
       actor: 'buyer',
       status: ORDER_STATUSES.AWAITING_PAYMENT_DETAILS,
-      statusLabel: 'AwaitingPaymentDetails',
+      statusLabel: translateOrderStatus(ORDER_STATUSES.AWAITING_PAYMENT_DETAILS),
       description:
         'Người thắng đấu giá cung cấp địa chỉ giao nhận và phương thức thanh toán để người bán kiểm chứng.',
     },
     {
       id: 'seller-confirm',
-      title: 'Xác nhận thanh toán & gửi hàng',
+      title: 'Xác nhận thanh toán và gửi hàng',
       actor: 'seller',
       status: ORDER_STATUSES.PAYMENT_CONFIRMED_AWAITING_DELIVERY,
-      statusLabel: 'PaymentConfirmed_AwaitingDelivery',
+      statusLabel: translateOrderStatus(ORDER_STATUSES.PAYMENT_CONFIRMED_AWAITING_DELIVERY),
       description: 'Người bán xác nhận đã nhận đủ tiền, cung cấp mã vận đơn và chứng từ vận chuyển.',
     },
     {
@@ -1350,7 +1402,7 @@ function getOrderWorkflowMetadata() {
       title: 'Người mua xác nhận đã nhận hàng',
       actor: 'buyer',
       status: ORDER_STATUSES.DELIVERY_CONFIRMED_READY_TO_RATE,
-      statusLabel: 'DeliveryConfirmed_ReadyToRate',
+      statusLabel: translateOrderStatus(ORDER_STATUSES.DELIVERY_CONFIRMED_READY_TO_RATE),
       description: 'Người mua xác nhận đã nhận hàng để mở form đánh giá.',
     },
     {
@@ -1358,8 +1410,8 @@ function getOrderWorkflowMetadata() {
       title: 'Đánh giá chất lượng giao dịch',
       actor: 'both',
       status: ORDER_STATUSES.TRANSACTION_COMPLETED,
-      statusLabel: 'TransactionCompleted',
-      description: 'Hai bên đánh giá lẫn nhau, có thể chỉnh sửa điểm +/- bất cứ lúc nào.',
+      statusLabel: translateOrderStatus(ORDER_STATUSES.TRANSACTION_COMPLETED),
+      description: 'Hai bên có thể đánh giá và chỉnh sửa điểm bất cứ lúc nào.',
     },
   ];
 }
@@ -1419,4 +1471,6 @@ module.exports = {
   appendOrderMessage,
   upsertOrderRating,
   canSellerCancelOrder,
+  ORDER_STATUS_LABELS,
+  translateOrderStatus,
 };
