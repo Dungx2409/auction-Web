@@ -9,23 +9,22 @@
       <a href="/">Trang chủ</a>
       <a href="/products">Sản phẩm</a>
       <div class="nav-account">
-        <a href="/account" class="nav-account-trigger">
-          <span class="nav-account-label">Tài khoản</span>
-          {{#if currentUser}}
-            <span class="nav-account-name">{{currentUser.name}}</span>
-          {{/if}}
-        </a>
-        <div class="nav-account-menu">
-          <a href="/account#profile">Thông tin cá nhân</a>
+        {{#if currentUser}}
+        <a class="nav-account-trigger" href="/account"> Hello, {{currentUser.name}}</a>
+        {{else}}
+        <a class="nav-account-trigger" href="/auth/login">Tài khoản</a>
+        {{/if}}
+        {{!-- <div class="nav-account-menu">
+          <a href="/account#profile"> Thông tin cá nhân</a>
           <a href="/account#security">Bảo mật mật khẩu</a>
           <a href="/account#products">Quản lí sản phẩm</a>
-        </div>
+        </div> --}}
       </div>
       {{#if currentUser}}
-        <a class="btn-login" href="/auth/logout">Đăng xuất</a>
+      <a class="btn-login" href="/auth/logout">Đăng xuất</a>
       {{else}}
-        <a class="btn-secondary" href="/auth/register">Đăng ký</a>
-        <a class="btn-login" href="/auth/login">Đăng nhập</a>
+      <a class="btn-secondary" href="/auth/register">Đăng ký</a>
+      <a class="btn-login" href="/auth/login">Đăng nhập</a>
       {{/if}}
     </nav>
   </div>

@@ -1,7 +1,7 @@
 <section class="account">
   {{> account/header user=user roles=roles}}
 
-  {{> account/nav currentSection=activeSection isSeller=isSeller isAdmin=isAdmin}}
+  {{> account/nav currentSection=activeSection isSeller=isSeller isAdmin=isAdmin isBidder=isBidder}}
 
   {{> account/actions currentSection=activeSection isSeller=isSeller isAdmin=isAdmin}}
 
@@ -13,6 +13,12 @@
     <div id="account-panel-security" class="account-section-panel {{#unless (eq activeSection 'security')}}is-hidden{{/unless}}" data-account-section="security" role="tabpanel" {{#unless (eq activeSection 'security')}}hidden{{/unless}}>
       {{> account/security-section}}
     </div>
+
+    {{#if isBidder}}
+    <div id="account-panel-watchlist" class="account-section-panel {{#unless (eq activeSection 'watchlist')}}is-hidden{{/unless}}" data-account-section="watchlist" role="tabpanel" {{#unless (eq activeSection 'watchlist')}}hidden{{/unless}}>
+      {{> account/watchlist-section bidder=bidder}}
+    </div>
+    {{/if}}
 
     <div id="account-panel-products" class="account-section-panel {{#unless (eq activeSection 'products')}}is-hidden{{/unless}}" data-account-section="products" role="tabpanel" {{#unless (eq activeSection 'products')}}hidden{{/unless}}>
       {{#if isSeller}}

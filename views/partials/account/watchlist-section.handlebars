@@ -1,0 +1,12 @@
+<section class="account-section account-watchlist">
+  <h2>Watchlist của tôi</h2>
+  {{#if bidder.watchlist.length}}
+    <div class="product-grid">
+      {{#each bidder.watchlist}}
+        {{> product-card product}}
+      {{/each}}
+    </div>
+  {{else}}
+    <p>Chưa có sản phẩm nào trong danh sách theo dõi.</p>
+  {{/if}}
+</section>

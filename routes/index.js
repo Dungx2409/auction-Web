@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const dataService = require('../services/dataService');
+const { buildWatchSet, applyWatchStateToList } = require('../helpers/watchlist');
 
 router.get('/', async (req, res, next) => {
   try {
@@ -9,6 +10,11 @@ router.get('/', async (req, res, next) => {
       dataService.getProductsMostBids(5),
       dataService.getProductsHighestPrice(5),
     ]);
+
+    const watchSet = buildWatchSet(req.watchlistProductIds || req.currentUser?.watchlistIds);
+    applyWatchStateToList(endingSoon, watchSet);
+    applyWatchStateToList(mostBids, watchSet);
+    applyWatchStateToList(highestPrice, watchSet);
 
     res.render('home', {
       title: 'Sàn đấu giá trực tuyến',
@@ -29,6 +35,9 @@ router.get('/search', async (req, res, next) => {
   try {
     const { q, sort = 'endingSoon', category } = req.query;
     const results = await dataService.searchProducts(q, { sort, categoryId: category });
+
+    const watchSet = buildWatchSet(req.watchlistProductIds || req.currentUser?.watchlistIds);
+    applyWatchStateToList(results, watchSet);
 
     res.render('search/results', {
       query: q,

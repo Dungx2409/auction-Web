@@ -11,7 +11,11 @@ SET search_path = auction, public;
 CREATE TYPE auction.user_role AS ENUM ('guest', 'bidder', 'seller', 'admin');
 CREATE TYPE auction.product_status AS ENUM ('draft','active','ended','removed');
 CREATE TYPE auction.order_status AS ENUM (
-  'await_payment', 'paid', 'shipped', 'completed', 'canceled'
+  'awaiting_payment_details',
+  'payment_confirmed_awaiting_delivery',
+  'delivery_confirmed_ready_to_rate',
+  'transaction_completed',
+  'canceled_by_seller'
 );
 
 -- 3. Users and related tables
@@ -183,8 +187,9 @@ CREATE TABLE auction.orders (
   product_id BIGINT NOT NULL REFERENCES auction.products(id) ON DELETE SET NULL,
   seller_id BIGINT REFERENCES auction.users(id) ON DELETE SET NULL,
   buyer_id BIGINT REFERENCES auction.users(id) ON DELETE SET NULL,
-  status auction.order_status NOT NULL DEFAULT 'await_payment',
+  status auction.order_status NOT NULL DEFAULT 'awaiting_payment_details',
   total_price NUMERIC(20,2) NOT NULL CHECK (total_price >= 0),
+  cancel_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -195,7 +200,9 @@ CREATE TABLE auction.order_invoices (
   order_id BIGINT NOT NULL REFERENCES auction.orders(id) ON DELETE CASCADE,
   billing_address TEXT,
   shipping_address TEXT,
-  payment_proof TEXT, -- could be URL to uploaded receipt
+  payment_method TEXT,
+  payment_proof TEXT,
+  note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE auction.order_invoices IS 'Khoá lưu bằng chứng thanh toán, địa chỉ giao hàng';
@@ -203,8 +210,10 @@ COMMENT ON TABLE auction.order_invoices IS 'Khoá lưu bằng chứng thanh toá
 CREATE TABLE auction.order_shipments (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   order_id BIGINT NOT NULL REFERENCES auction.orders(id) ON DELETE CASCADE,
+  carrier TEXT,
   tracking_number TEXT,
   shipping_date TIMESTAMPTZ,
+  invoice_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE auction.order_shipments IS 'Thông tin vận chuyển';

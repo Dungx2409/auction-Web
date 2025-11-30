@@ -81,4 +81,10 @@ module.exports = {
     const key = String(status || '').toLowerCase();
     return map[key] || 'status-pill--default';
   },
+  initial(value) {
+    if (!value) return '?';
+    const text = String(value).trim();
+    if (!text) return '?';
+    return text.charAt(0).toUpperCase();
+  },
 };

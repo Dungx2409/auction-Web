@@ -1,28 +1,73 @@
 <article class="product-detail">
-  <div class="gallery">
-    <img class="main" src="{{product.images.[0]}}" alt="{{product.title}}" />
-    <div class="thumbs">
-      {{#each product.images}}
+  <div class="product-media">
+    <div class="gallery">
+      <img class="main" src="{{product.images.[0]}}" alt="{{product.title}}" />
+      <div class="thumbs">
+        {{#each product.images}}
         <img src="{{this}}" alt="{{../product.title}} thumbnail" />
-      {{/each}}
+        {{/each}}
+      </div>
     </div>
+
+    <section class="media-tabs" data-product-tabs>
+      <div class="media-tabs__nav" role="tablist">
+        <button
+          type="button"
+          class="media-tab is-active"
+          data-tab="seller"
+          role="tab"
+          aria-selected="true"
+        >
+          Thông tin người bán
+        </button>
+        <button
+          type="button"
+          class="media-tab"
+          data-tab="shipping"
+          role="tab"
+          aria-selected="false"
+        >
+          Vận chuyển & thanh toán
+        </button>
+      </div>
+
+      <div class="media-tabs__panel is-active" data-tab-panel="seller" role="tabpanel">
+        <h3>Người bán {{maskName product.seller.name}}</h3>
+        <ul>
+          <li>Đánh giá: {{product.seller.ratingPlus}} 👍 / {{product.seller.ratingMinus}} 👎
+            ({{product.seller.ratingScore}}%)</li>
+          <li>Phản hồi trong: {{product.seller.responseTime}}</li>
+          <li>Huy hiệu: {{#each product.seller.badges}}<span class="badge">{{this}}</span>{{/each}}</li>
+        </ul>
+      </div>
+
+      <div class="media-tabs__panel" data-tab-panel="shipping" role="tabpanel" hidden>
+        <h3>Vận chuyển & thanh toán</h3>
+        <p><strong>Giao hàng:</strong> {{#each product.shippingOptions}}<span>{{this}}</span>{{#unless @last}},
+          {{/unless}}{{/each}}</p>
+        <p><strong>Thanh toán:</strong> {{#each product.paymentMethods}}<span>{{this}}</span>{{#unless @last}},
+          {{/unless}}{{/each}}</p>
+        <p><strong>Ngày đăng:</strong> {{formatDate product.startDate}} ({{relativeTime product.startDate}})</p>
+      </div>
+    </section>
   </div>
   <div class="info">
     <h1>{{product.title}}</h1>
     <div class="price-block">
       <span class="price-current">{{formatCurrency product.currentPrice}}</span>
       {{#if product.buyNowPrice}}
-        <span class="price-buy">Mua ngay {{formatCurrency product.buyNowPrice}}</span>
+      <span class="price-buy">Mua ngay {{formatCurrency product.buyNowPrice}}</span>
       {{/if}}
     </div>
     <dl class="summary">
       <div>
         <dt>Người đang dẫn</dt>
-        <dd>{{maskName product.highestBidder.name}} ({{percent product.highestBidder.ratingPlus (add product.highestBidder.ratingPlus product.highestBidder.ratingMinus)}})</dd>
+        <dd data-bid-leader>{{maskName product.highestBidder.name}} ({{percent product.highestBidder.ratingPlus (add
+          product.highestBidder.ratingPlus product.highestBidder.ratingMinus)}})</dd>
       </div>
       <div>
         <dt>Lượt ra giá</dt>
-        <dd>{{product.bidCount}}</dd>
+        <dd data-bid-count>{{product.bidCount}}</dd>
       </div>
       <div>
         <dt>Yêu thích</dt>
@@ -31,32 +76,132 @@
     </dl>
 
     <div class="time-left" data-enddate="{{product.endDate}}">
-      Thời gian còn lại: <span class="countdown">--:--:--</span>
+      {{#if auctionClosed}}
+        Phiên đấu giá đã kết thúc{{#if product.endDate}} ({{formatDate product.endDate}}){{/if}}
+      {{else}}
+        Thời gian còn lại: <span class="countdown">--:--:--</span>
+      {{/if}}
     </div>
 
-    <div class="actions">
-      <button class="btn primary">Đặt giá + {{formatCurrency product.bidStep}}</button>
-      <button class="btn secondary">Thêm vào Watchlist</button>
-      <button class="btn tertiary">Hỏi người bán</button>
+    {{#if auctionClosed}}
+    <div class="auction-status-banner" role="status">
+      <strong>Không thể tiếp tục đặt giá</strong>
+      <p>
+        {{#if (eq auctionClosedReason 'time')}}Sản phẩm đã hết thời gian đấu giá.{{else}}Phiên đấu giá đã được người bán đóng lại.{{/if}}
+      </p>
+    </div>
+    {{/if}}
+
+    {{#if bidContext}}
+    <section class="bidding-panel" aria-labelledby="bidding-panel-title">
+      <div class="bid-panel-header">
+        <h2 id="bidding-panel-title">Đặt giá</h2>
+        <p>Giá gợi ý được tính bằng giá hiện tại cộng với bước giá người bán thiết lập.</p>
+      </div>
+
+      <div class="bid-price-grid">
+        <article class="bid-price-card">
+          <span>Giá hiện tại</span>
+          <strong data-current-price>{{#if bidContext.currentPrice}}{{formatCurrency bidContext.currentPrice}}{{else}}—{{/if}}</strong>
+        </article>
+        <article class="bid-price-card">
+          <span>Giá gợi ý</span>
+          <strong data-suggested-price>{{#if bidContext.suggestedBid}}{{formatCurrency bidContext.suggestedBid}}{{else}}—{{/if}}</strong>
+          {{#if bidContext.bidStep}}
+          <small>Bước giá tối thiểu {{formatCurrency bidContext.bidStep}}</small>
+          {{/if}}
+        </article>
+      </div>
+
+      <div class="bid-entry">
+        <label for="bid-amount-{{product.id}}">Nhập giá bạn muốn đặt</label>
+        <div class="bid-entry-control">
+          <span>₫</span>
+          <input
+            id="bid-amount-{{product.id}}"
+            type="text"
+            name="bidAmount"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            {{#if bidContext.suggestedBid}}value="{{bidContext.suggestedBid}}" data-initial-value="{{bidContext.suggestedBid}}"{{/if}}
+            {{#if bidContext.nextMinimumBid}}data-min-bid="{{bidContext.nextMinimumBid}}"{{/if}}
+            {{#if bidContext.bidStep}}data-bid-step="{{bidContext.bidStep}}"{{/if}}
+            data-base-amount="{{bidContext.bidBase}}"
+            {{#unless bidContext.canBid}}disabled{{/unless}}
+            data-bid-input
+          />
+        </div>
+      </div>
+
+      <div class="bid-notices">
+        {{#if bidContext.requiresLogin}}
+          <p class="bid-notice bid-notice--muted">Đăng nhập để tham gia đấu giá và theo dõi sản phẩm.</p>
+        {{/if}}
+        {{#if bidContext.showRatingNotice}}
+          <p class="bid-notice bid-notice--warning">{{bidContext.ratingRuleMessage}}</p>
+        {{/if}}
+        {{#if bidContext.showExceptionNote}}
+          <p class="bid-notice bid-notice--info">Bạn chưa có đánh giá nhưng người bán đã cho phép tài khoản mới đặt giá.</p>
+        {{/if}}
+        {{#if bidContext.ratingPercent}}
+          <p class="bid-notice bid-notice--meta">Điểm hiện tại: {{bidContext.ratingPercent}}% ({{bidContext.ratingPlus}} / {{add bidContext.ratingPlus bidContext.ratingMinus}} lần đánh giá)</p>
+        {{/if}}
+      </div>
+
+      <div class="bid-button-row">
+        <button
+          type="button"
+          class="btn primary btn-pill"
+          data-bid-trigger
+          data-product-id="{{product.id}}"
+          {{#if bidContext.suggestedBid}}data-suggested-bid="{{bidContext.suggestedBid}}"{{/if}}
+          {{#if bidContext.bidStep}}data-bid-step="{{bidContext.bidStep}}"{{/if}}
+          {{#if bidContext.nextMinimumBid}}data-min-bid="{{bidContext.nextMinimumBid}}"{{/if}}
+          {{#unless bidContext.canBid}}disabled{{/unless}}
+        >
+          Xác nhận đặt giá
+        </button>
+        <button
+          type="button"
+          class="watchlist-button watchlist-button--group btn-pill{{#if product.isWatching}} is-watching{{/if}}"
+          data-product-id="{{product.id}}"
+          data-watch-state="{{#if product.isWatching}}watching{{else}}idle{{/if}}"
+          aria-pressed="{{#if product.isWatching}}true{{else}}false{{/if}}"
+          aria-label="{{#if product.isWatching}}Bỏ lưu {{product.title}}{{else}}Lưu {{product.title}} vào danh sách yêu thích{{/if}}"
+        >
+          <span class="watchlist-heart" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+              <path d="M12 21.35l-1.45-1.32C6 15.36 3 12.28 3 8.5 3 6 5 4 7.5 4c1.74 0 3.41 1 4.5 2.44C13.59 5 15.26 4 17 4c2.5 0 4.5 2 4.5 4.5 0 3.78-3 6.86-7.55 11.54L12 21.35z" />
+            </svg>
+          </span>
+          <span class="watch-count">{{#if product.watchers}}{{product.watchers}}{{else}}0{{/if}}</span>
+        </button>
+      </div>
+    </section>
+    {{/if}}
+
+    <div class="actions actions--qa">
+      <button class="btn tertiary" type="button" data-scroll-target="#qa-thread">Hỏi và Đáp</button>
     </div>
 
-    <section class="seller-card">
-      <h3>Người bán {{product.seller.name}}</h3>
-      <ul>
-        <li>Đánh giá: {{product.seller.ratingPlus}} 👍 / {{product.seller.ratingMinus}} 👎 ({{product.seller.ratingScore}}%)</li>
-        <li>Phản hồi trong: {{product.seller.responseTime}}</li>
-        <li>Huy hiệu: {{#each product.seller.badges}}<span class="badge">{{this}}</span>{{/each}}</li>
-      </ul>
-    </section>
-
-    <section class="shipping">
-      <h3>Vận chuyển & thanh toán</h3>
-      <p><strong>Giao hàng:</strong> {{#each product.shippingOptions}}<span>{{this}}</span>{{#unless @last}}, {{/unless}}{{/each}}</p>
-      <p><strong>Thanh toán:</strong> {{#each product.paymentMethods}}<span>{{this}}</span>{{#unless @last}}, {{/unless}}{{/each}}</p>
-      <p><strong>Ngày đăng:</strong> {{formatDate product.startDate}} ({{relativeTime product.startDate}})</p>
-    </section>
   </div>
 </article>
+
+<div class="bid-confirm-modal" data-bid-modal data-product-id="{{product.id}}" hidden>
+  <div class="bid-confirm-modal__overlay" data-modal-overlay data-modal-close></div>
+  <div class="bid-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="bid-modal-title">
+    <header class="bid-confirm-modal__header">
+      <h3 id="bid-modal-title">Xác nhận đặt giá</h3>
+      <button type="button" class="modal-close" data-modal-close aria-label="Đóng">&times;</button>
+    </header>
+    <p>Bạn sắp đặt giá <strong data-bid-amount>—</strong> cho <em>{{product.title}}</em>.</p>
+    <p class="modal-note">Hệ thống sẽ ghi nhận sau khi bạn xác nhận. Vui lòng kiểm tra lại số tiền.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn tertiary" data-modal-close>Huỷ</button>
+      <button type="button" class="btn primary" data-modal-confirm>Đặt giá</button>
+    </div>
+  </div>
+</div>
 
 <section class="product-description">
   <h2>Thông tin sản phẩm</h2>
@@ -64,7 +209,7 @@
   <h3>Tài liệu đính kèm</h3>
   <ul class="documents">
     {{#each product.documents}}
-      <li>{{this}}</li>
+    <li>{{this}}</li>
     {{/each}}
   </ul>
 </section>
@@ -73,42 +218,134 @@
   <h2>Lịch sử đấu giá</h2>
   <table>
     <thead>
-      <tr style="text-align: left;"><th>Thời điểm</th><th>Người mua</th><th>Giá</th></tr>
+      <tr style="text-align: left;">
+        <th>Thời điểm</th>
+        <th>Người mua</th>
+        <th>Giá</th>
+      </tr>
     </thead>
-    <tbody>
+    <tbody data-bid-history>
       {{#each product.bids}}
-        <tr>
-          <td>{{formatDate time}}</td>
-          <td>{{maskName userName}}</td>
-          <td>{{formatCurrency amount}}</td>
-        </tr>
+      <tr>
+        <td>{{formatDate time}}</td>
+        <td>{{maskName userName}}</td>
+        <td>{{formatCurrency amount}}</td>
+      </tr>
       {{/each}}
     </tbody>
   </table>
 </section>
 
-<section class="qa-section">
-  <h2>Hỏi & đáp</h2>
-  {{#each product.questions}}
-    <article class="qa-item">
-      <header>
-        <strong>{{maskName askedBy}}</strong>
-        <span class="time">{{relativeTime askedAt}}</span>
-      </header>
-      <p class="question">{{question}}</p>
-      <strong>Phản hồi của người bán:</strong>
-      <p class="answer" style="opacity: 0.5;">{{answer}}</p>
+<section class="qa-section" id="qa-thread">
+  <header class="qa-header">
+    <div>
+      <h2>Hỏi & đáp</h2>
+      {{!-- <p class="qa-subtitle">{{product.questions.length}} bình luận công khai</p> --}}
+    </div>
+    {{#if qaStatus.error}}
+    <div class="qa-alert qa-alert--error">
+      {{#if (eq qaStatus.error 'empty')}}Vui lòng nhập nội dung câu hỏi.{{/if}}
+      {{#if (eq qaStatus.error 'emptyAnswer')}}Vui lòng nhập nội dung phản hồi.{{/if}}
+      {{#if (eq qaStatus.error 'owner')}}Bạn là người bán của sản phẩm này nên không thể đặt câu hỏi.{{/if}}
+      {{#if (eq qaStatus.error 'notSeller')}}Chỉ người bán mới được trả lời câu hỏi.{{/if}}
+      {{#if (eq qaStatus.error 'notfound')}}Không tìm thấy câu hỏi để trả lời.{{/if}}
+    </div>
+    {{/if}}
+    {{#if qaStatus.success}}
+    <div class="qa-alert qa-alert--success">
+      {{#if (eq qaStatus.success 'question')}}Đã gửi câu hỏi tới người bán.{{/if}}
+      {{#if (eq qaStatus.success 'answer')}}Đã gửi phản hồi đến người mua.{{/if}}
+    </div>
+    {{/if}}
+  </header>
+
+  <div class="qa-composer">
+    {{#if canAskQuestion}}
+    <form action="/products/{{product.id}}/questions" method="post" class="qa-form" data-qa-form="question">
+      <div class="qa-avatar" aria-hidden="true" data-letter="{{initial currentUser.name}}"></div>
+      <div class="qa-form-body">
+        <textarea name="question" rows="2" placeholder="Hỏi người bán về sản phẩm..."
+          required data-auto-resize></textarea>
+        <div class="qa-form-actions">
+          <button type="submit" class="btn primary">Gửi câu hỏi</button>
+        </div>
+      </div>
+    </form>
+    {{else if isAuthenticated}}
+    {{else}}
+    <div class="qa-placeholder">
+      <p>Đăng nhập để trò chuyện với người bán.</p>
+      <a class="btn secondary" href="/auth/login?returnUrl=/products/{{product.id}}">Đăng nhập ngay</a>
+    </div>
+    {{/if}}
+  </div>
+
+  <div class="qa-thread">
+    {{#if product.questions.length}}
+    {{#each product.questions}}
+    <article class="qa-comment" id="comment-{{id}}">
+      <div class="qa-avatar" aria-hidden="true" data-letter="{{initial askedBy}}"></div>
+      <div class="qa-bubble">
+        <div class="qa-meta">
+          <strong>{{maskName askedBy}}</strong>
+          <span>{{relativeTime askedAt}}</span>
+        </div>
+        <p class="qa-question">{{question}}</p>
+        <div class="qa-actions">
+          <span>{{answers.length}} phản hồi</span>
+          {{#if @root.canAnswerQuestion}}
+          <button type="button" class="qa-action-link" data-action="toggle-reply" data-target="reply-{{id}}">Trả
+            lời</button>
+          {{/if}}
+        </div>
+        <div class="qa-replies">
+          {{#if answers.length}}
+          {{#each answers}}
+          <article class="qa-reply">
+            <div class="qa-avatar qa-avatar--small" aria-hidden="true" data-letter="{{initial answeredBy}}"></div>
+            <div class="qa-bubble">
+              <div class="qa-meta">
+                <strong>{{maskName answeredBy}}</strong>
+                <span>{{relativeTime answeredAt}}</span>
+              </div>
+              <p class="qa-answer">{{text}}</p>
+            </div>
+          </article>
+          {{/each}}
+          {{else}}
+            {{#if @root.canAnswerQuestion}}
+            <p class="qa-reply-placeholder">Bạn chưa phản hồi câu hỏi này.</p>
+            {{/if}}
+          {{/if}}
+        </div>
+        {{#if @root.canAnswerQuestion}}
+        <form class="qa-reply-form" id="reply-{{id}}" action="/products/{{@root.product.id}}/questions/{{id}}/answers"
+          method="post" hidden>
+          <textarea name="answer" rows="2" placeholder="Gửi phản hồi tới người mua..." required data-auto-resize></textarea>
+          <div class="qa-form-actions">
+            <span>Phản hồi sẽ hiển thị công khai.</span>
+            <button type="submit" class="btn primary">Gửi phản hồi</button>
+          </div>
+        </form>
+        {{/if}}
+      </div>
     </article>
-  {{/each}}
+    {{/each}}
+    {{else}}
+    <div class="qa-placeholder">
+      <p>Hãy là người đầu tiên đặt câu hỏi cho sản phẩm này!</p>
+    </div>
+    {{/if}}
+  </div>
 </section>
 
 {{#if relatedProducts.length}}
-  <section class="related-products">
-    <h2>Sản phẩm cùng danh mục</h2>
-    <div class="product-grid">
-      {{#each relatedProducts}}
-        {{> product-card}}
-      {{/each}}
-    </div>
-  </section>
+<section class="related-products">
+  <h2>Sản phẩm cùng danh mục</h2>
+  <div class="product-grid">
+    {{#each relatedProducts}}
+    {{> product-card}}
+    {{/each}}
+  </div>
+</section>
 {{/if}}

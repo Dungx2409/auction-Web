@@ -38,6 +38,7 @@ app.use(async (req, res, next) => {
 		]);
 
 		let currentUser = null;
+		let watchlistProductIds = [];
 		const rawUserId = req.cookies?.userId;
 		if (rawUserId) {
 			const numericId = Number(rawUserId);
@@ -45,11 +46,16 @@ app.use(async (req, res, next) => {
 			currentUser = (await dataService.getUserById(lookupId)) || null;
 			if (!currentUser) {
 				res.clearCookie('userId');
+			} else {
+				watchlistProductIds = await dataService.getWatchlistProductIds(currentUser.id);
+				currentUser.watchlistIds = watchlistProductIds;
 			}
 		}
 
 		req.currentUser = currentUser;
+		req.watchlistProductIds = watchlistProductIds;
 		res.locals.currentUser = currentUser;
+		res.locals.watchlistProductIds = watchlistProductIds;
 		res.locals.site = {
 			categories,
 			settings,
@@ -68,11 +74,13 @@ const indexRouter = require('./routes/index');
 const productsRouter = require('./routes/products');
 const accountRouter = require('./routes/account');
 const authRouter = require('./routes/auth');
+const ordersRouter = require('./routes/orders');
 
 app.use('/', indexRouter);
 app.use('/products', productsRouter);
 app.use('/account', accountRouter);
 app.use('/auth', authRouter);
+app.use('/orders', ordersRouter);
 
 // Fallback 404
 app.use((req, res) => {

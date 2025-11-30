@@ -1,7 +1,7 @@
 <section class="account">
   {{> account/header user=user roles=roles}}
 
-  {{> account/nav currentSection='products' isSeller=isSeller isAdmin=isAdmin}}
+  {{> account/nav currentSection='products' isSeller=isSeller isAdmin=isAdmin isBidder=isBidder}}
 
   {{> account/actions currentSection='products' isSeller=isSeller}}
 
@@ -10,4 +10,4 @@
   {{else}}
     {{> account/seller-locked}}
   {{/if}}
-</section>
+</section>  

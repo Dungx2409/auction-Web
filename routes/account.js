@@ -3,8 +3,18 @@ const bcrypt = require('bcryptjs');
 const dayjs = require('dayjs');
 const dataService = require('../services/dataService');
 const userStore = require('../services/userStore');
+const { buildWatchSet, applyWatchStateToList, applyWatchStateToProduct } = require('../helpers/watchlist');
 
 const router = express.Router();
+
+const MIN_TITLE_LENGTH = 8;
+const MAX_TITLE_LENGTH = 120;
+const MIN_SHORT_DESCRIPTION_LENGTH = 30;
+const MAX_SHORT_DESCRIPTION_LENGTH = 240;
+const MIN_FULL_DESCRIPTION_LENGTH = 80;
+const MIN_AUCTION_DURATION_MINUTES = 60;
+const MAX_AUCTION_DURATION_DAYS = 30;
+const MIN_PRICE_VALUE = 1000;
 
 function ensureAuthenticated(req, res, next) {
   if (!req.currentUser) {
@@ -59,6 +69,7 @@ async function buildAccountContext(user, extras = {}) {
   const isBidder = roles.includes('bidder');
   const isSeller = roles.includes('seller');
   const isAdmin = roles.includes('admin');
+  const watchSet = buildWatchSet(user?.watchlistIds);
 
   const context = {
     title: 'Tài khoản của tôi',
@@ -82,9 +93,16 @@ async function buildAccountContext(user, extras = {}) {
     ]);
 
     const recommended = recommendedSource.filter((product) => !wins.some((win) => win.id === product.id));
+    const enrichedWatchlist = watchlistItems.map((entry) => ({
+      ...entry,
+      product: applyWatchStateToProduct(entry.product, watchSet),
+    }));
+    applyWatchStateToList(activeBids, watchSet);
+    applyWatchStateToList(wins, watchSet);
+    applyWatchStateToList(recommended, watchSet);
 
     context.bidder = {
-      watchlist: watchlistItems,
+      watchlist: enrichedWatchlist,
       activeBids,
       wins,
       recommended,
@@ -104,6 +122,9 @@ async function buildAccountContext(user, extras = {}) {
     const defaultForm = buildSellerProductFormDefaults(flattenedCategories);
     const sellerExtras = extras.seller || {};
     const providedForm = sellerExtras.productForm || {};
+    applyWatchStateToList(activeProducts, watchSet);
+    applyWatchStateToList(endedProducts, watchSet);
+    applyWatchStateToList(draftProducts, watchSet);
 
     context.seller = {
       activeProducts,
@@ -123,6 +144,8 @@ async function buildAccountContext(user, extras = {}) {
       },
       productErrors: sellerExtras.productErrors || {},
       productFlash: sellerExtras.productFlash || null,
+      editingProductId: sellerExtras.editingProductId || null,
+      editingProductTitle: sellerExtras.editingProductTitle || null,
     };
   } else if (extras.seller) {
     context.seller = {
@@ -189,6 +212,9 @@ async function buildAccountContext(user, extras = {}) {
   context.passwordFlash = extras.passwordFlash || null;
 
   let requestedSection = extras.activeSection || context.activeSection || 'profile';
+  if (requestedSection === 'watchlist' && !isBidder) {
+    requestedSection = 'profile';
+  }
   if (requestedSection === 'admin' && !isAdmin) {
     requestedSection = 'profile';
   }
@@ -221,6 +247,10 @@ router.get('/profile', (req, res, next) => {
 
 router.get('/security', (req, res, next) => {
   renderAccountPage(req, res, next, { section: 'security' });
+});
+
+router.get('/watchlist', (req, res, next) => {
+  renderAccountPage(req, res, next, { section: 'watchlist' });
 });
 
 router.get('/products', (req, res, next) => {
@@ -532,24 +562,49 @@ function sanitizeProductText(value = '') {
   return value.trim();
 }
 
+function stripHtml(value = '') {
+  return value.replace(/<[^>]*>/g, ' ');
+}
+
+function normalizeWhitespace(value = '') {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function parseGalleryUrls(value = '') {
+  const lines = value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return lines;
+}
+
 function validateProductInput(body = {}) {
   const errors = {};
+  const rawProductId = body.productId ? Number(body.productId) : null;
+  const productId = Number.isFinite(rawProductId) && rawProductId > 0 ? rawProductId : null;
+  const isEditing = Boolean(productId);
   const formValues = {
     title: sanitizeProductText(body.title),
     shortDescription: sanitizeProductText(body.shortDescription || body.summary || ''),
-    fullDescription: (body.fullDescription || '').trim(),
+    fullDescription: sanitizeProductText(body.fullDescription || ''),
     categoryId: body.categoryId ? String(body.categoryId) : '',
     startPrice: body.startPrice ?? '',
     stepPrice: body.stepPrice ?? '',
+    currentPrice: body.startPrice ?? '',
     buyNowPrice: body.buyNowPrice ?? '',
     startDate: body.startDate || '',
     endDate: body.endDate || '',
     imageUrl: sanitizeProductText(body.imageUrl || ''),
+    galleryUrls: body.galleryUrls || '',
+    imageFile: body.imageFile || null,
     autoExtend: body.autoExtend === 'on' || body.autoExtend === 'true' || body.autoExtend === true,
+    productId: productId ? String(productId) : '',
   };
 
   if (!formValues.title) {
     errors.title = 'Vui lòng nhập tên sản phẩm.';
+  } else if (formValues.title.length < MIN_TITLE_LENGTH || formValues.title.length > MAX_TITLE_LENGTH) {
+    errors.title = `Tên sản phẩm phải từ ${MIN_TITLE_LENGTH} đến ${MAX_TITLE_LENGTH} ký tự.`;
   }
 
   if (!formValues.shortDescription && formValues.fullDescription) {
@@ -558,10 +613,18 @@ function validateProductInput(body = {}) {
 
   if (!formValues.shortDescription) {
     errors.shortDescription = 'Hãy mô tả ngắn gọn sản phẩm của bạn.';
+  } else if (
+    formValues.shortDescription.length < MIN_SHORT_DESCRIPTION_LENGTH ||
+    formValues.shortDescription.length > MAX_SHORT_DESCRIPTION_LENGTH
+  ) {
+    errors.shortDescription = `Mô tả ngắn cần từ ${MIN_SHORT_DESCRIPTION_LENGTH} đến ${MAX_SHORT_DESCRIPTION_LENGTH} ký tự.`;
   }
 
-  if (!formValues.fullDescription) {
+  const plainFullDescription = normalizeWhitespace(stripHtml(formValues.fullDescription));
+  if (!plainFullDescription) {
     errors.fullDescription = 'Vui lòng nhập mô tả chi tiết sản phẩm.';
+  } else if (plainFullDescription.length < MIN_FULL_DESCRIPTION_LENGTH) {
+    errors.fullDescription = `Mô tả chi tiết cần tối thiểu ${MIN_FULL_DESCRIPTION_LENGTH} ký tự.`;
   }
 
   const categoryId = Number(formValues.categoryId);
@@ -572,11 +635,17 @@ function validateProductInput(body = {}) {
   const startPrice = Number(formValues.startPrice);
   if (!Number.isFinite(startPrice) || startPrice <= 0) {
     errors.startPrice = 'Giá khởi điểm phải lớn hơn 0.';
+  } else if (startPrice < MIN_PRICE_VALUE) {
+    errors.startPrice = `Giá khởi điểm tối thiểu là ${MIN_PRICE_VALUE.toLocaleString('vi-VN')} đ.`;
   }
 
   const stepPrice = Number(formValues.stepPrice);
   if (!Number.isFinite(stepPrice) || stepPrice <= 0) {
     errors.stepPrice = 'Bước giá phải lớn hơn 0.';
+  } else if (stepPrice < MIN_PRICE_VALUE) {
+    errors.stepPrice = `Bước giá tối thiểu là ${MIN_PRICE_VALUE.toLocaleString('vi-VN')} đ.`;
+  } else if (Number.isFinite(startPrice) && stepPrice >= startPrice) {
+    errors.stepPrice = 'Bước giá phải nhỏ hơn giá khởi điểm.';
   }
 
   let buyNowPrice = null;
@@ -586,11 +655,14 @@ function validateProductInput(body = {}) {
       errors.buyNowPrice = 'Giá mua ngay phải lớn hơn 0.';
     } else if (Number.isFinite(startPrice) && parsed <= startPrice) {
       errors.buyNowPrice = 'Giá mua ngay phải cao hơn giá khởi điểm.';
+    } else if (Number.isFinite(startPrice) && Number.isFinite(stepPrice) && parsed <= startPrice + stepPrice) {
+      errors.buyNowPrice = 'Giá mua ngay phải cao hơn ít nhất một bước giá so với giá khởi điểm.';
     } else {
       buyNowPrice = parsed;
     }
   }
 
+  const now = dayjs();
   let startDate = null;
   if (!formValues.startDate) {
     errors.startDate = 'Vui lòng chọn thời gian bắt đầu.';
@@ -601,6 +673,9 @@ function validateProductInput(body = {}) {
     } else {
       startDate = parsed;
       formValues.startDate = parsed.format('YYYY-MM-DDTHH:mm');
+      if (!isEditing && startDate.isBefore(now.add(15, 'minute'))) {
+        errors.startDate = 'Thời gian bắt đầu phải sau thời điểm hiện tại ít nhất 15 phút.';
+      }
     }
   }
 
@@ -616,25 +691,54 @@ function validateProductInput(body = {}) {
     } else {
       endDate = parsed;
       formValues.endDate = parsed.format('YYYY-MM-DDTHH:mm');
+      if (startDate) {
+        const durationMinutes = endDate.diff(startDate, 'minute');
+        if (durationMinutes < MIN_AUCTION_DURATION_MINUTES) {
+          errors.endDate = `Phiên đấu giá cần kéo dài ít nhất ${MIN_AUCTION_DURATION_MINUTES / 60} giờ.`;
+        }
+        const durationDays = endDate.diff(startDate, 'day', true);
+        if (!errors.endDate && durationDays > MAX_AUCTION_DURATION_DAYS) {
+          errors.endDate = `Phiên đấu giá không được vượt quá ${MAX_AUCTION_DURATION_DAYS} ngày.`;
+        }
+      }
     }
   }
-
-  if (formValues.imageUrl && !isValidUrl(formValues.imageUrl)) {
+  if (!formValues.imageUrl) {
+    errors.imageUrl = 'Vui lòng nhập đường dẫn ảnh chính của sản phẩm.';
+  } else if (!isValidUrl(formValues.imageUrl)) {
     errors.imageUrl = 'Đường dẫn ảnh không hợp lệ.';
   }
 
+  const parsedGalleryUrls = parseGalleryUrls(formValues.galleryUrls);
+
+  if (parsedGalleryUrls.length > 0) {
+    for (const url of parsedGalleryUrls) {
+      if (!isValidUrl(url)) {
+        errors.galleryUrls = 'Một hoặc nhiều đường dẫn ảnh bổ sung không hợp lệ.';
+        break;
+      }
+    }
+  }
+  if (!errors.galleryUrls && parsedGalleryUrls.length < 3) {
+    errors.galleryUrls = 'Vui lòng cung cấp ít nhất 3 ảnh bổ sung cho sản phẩm.';
+  }
+
   const values = {
+    productId,
     title: formValues.title,
     shortDescription: formValues.shortDescription,
     fullDescription: formValues.fullDescription,
     categoryId,
     startPrice,
+    currentPrice: formValues.currentPrice ?? '',
     stepPrice,
     buyNowPrice,
     startDate: startDate ? startDate.toDate() : null,
     endDate: endDate ? endDate.toDate() : null,
     autoExtend: formValues.autoExtend,
     imageUrl: formValues.imageUrl || null,
+    galleryUrls: parsedGalleryUrls,
+    imageFile: formValues.imageFile || null,
   };
 
   return { errors, values, formValues };
@@ -760,39 +864,64 @@ router.post('/products', async (req, res, next) => {
       });
       return res.status(403).render('account/overview', context);
     }
-
     const { errors, values, formValues } = validateProductInput(req.body || {});
+    const isEditing = Boolean(values.productId);
+    console.log('Validated product values:', values);
     if (Object.keys(errors).length > 0) {
       const context = await buildAccountContext(user, {
         seller: {
           productForm: formValues,
           productErrors: errors,
+          editingProductId: isEditing ? values.productId : null,
         },
         activeSection: 'products',
       });
       return res.status(400).render('account/overview', context);
     }
-
-    await dataService.createProduct({
-      sellerId: user.id,
-      categoryId: values.categoryId,
-      title: values.title,
-      shortDescription: values.shortDescription,
-      fullDescription: values.fullDescription,
-      startPrice: values.startPrice,
-      stepPrice: values.stepPrice,
-      buyNowPrice: values.buyNowPrice,
-      startDate: values.startDate,
-      endDate: values.endDate,
-      autoExtend: values.autoExtend,
-      imageUrl: values.imageUrl,
-    });
+    // console.log('Validated product values:', values.galleryUrls);
+    if (isEditing) {
+      await dataService.updateProduct({
+        productId: values.productId,
+        sellerId: user.id,
+        categoryId: values.categoryId,
+        title: values.title,
+        shortDescription: values.shortDescription,
+        fullDescription: values.fullDescription,
+        startPrice: values.startPrice,
+        stepPrice: values.stepPrice,
+        buyNowPrice: values.buyNowPrice,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        autoExtend: values.autoExtend,
+        imageUrl: values.imageUrl,
+        galleryUrls: values.galleryUrls,
+      });
+    } else {
+      await dataService.createProduct({
+        sellerId: user.id,
+        categoryId: values.categoryId,
+        title: values.title,
+        shortDescription: values.shortDescription,
+        fullDescription: values.fullDescription,
+        startPrice: values.startPrice,
+        stepPrice: values.stepPrice,
+        buyNowPrice: values.buyNowPrice,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        autoExtend: values.autoExtend,
+        imageUrl: values.imageUrl,
+        galleryUrls: values.galleryUrls,
+        imageFile: values.imageFile,
+      });
+    }
 
     const context = await buildAccountContext(user, {
       seller: {
         productFlash: {
           type: 'success',
-          message: 'Đăng sản phẩm thành công! Sản phẩm của bạn đã sẵn sàng hiển thị.',
+          message: isEditing
+            ? 'Cập nhật sản phẩm thành công! Thông tin mới đã được áp dụng.'
+            : 'Đăng sản phẩm thành công! Sản phẩm của bạn đã sẵn sàng hiển thị.',
         },
       },
       activeSection: 'products',
@@ -809,6 +938,76 @@ router.get('/seller', (req, res) => {
 
 router.get('/admin/dashboard', (req, res) => {
   res.redirect('/account/admin');
+});
+
+router.get('/products/:id/delete', async (req, res, next) => {
+  try {
+    const productId = req.params.id;
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.redirect('/auth/login');
+    }
+    if (!resolveRoles(user).includes('seller')) {
+      return res.status(403).render('403', { title: 'Bạn không có quyền xóa sản phẩm.' });
+    }
+    const removed = await dataService.removeProduct(productId);
+    if (!removed) {
+      return res.status(404).render('404', { title: 'Sản phẩm không tồn tại hoặc đã được xóa.' });
+    }
+    return res.redirect('/account/products');
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/products/:id/edit', async (req, res, next) => {
+  try {
+    const productId = req.params.id;
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.redirect('/auth/login');
+    }
+    const product = await dataService.getProductById(productId, { includeBannedSeller: true });
+    if (!product) {
+      return res.status(404).render('404', { title: 'Sản phẩm không tồn tại' });
+    }
+    if (String(product.seller?.id) !== String(user.id)) {
+      return res.status(403).render('403', { title: 'Bạn không có quyền chỉnh sửa sản phẩm này.' });
+    }
+
+    const productForm = {
+      productId: product.id,
+      title: product.title,
+      shortDescription: product.summary,
+      fullDescription: product.description,
+      categoryId: product.categoryId ? String(product.categoryId) : '',
+      startPrice: product.startPrice,
+      stepPrice: product.bidStep,
+      buyNowPrice: product.buyNowPrice ?? '',
+      startDate: product.startDate ? dayjs(product.startDate).format('YYYY-MM-DDTHH:mm') : '',
+      endDate: product.endDate ? dayjs(product.endDate).format('YYYY-MM-DDTHH:mm') : '',
+      imageUrl: product.images?.[0] || '',
+      galleryUrls: (product.images || []).slice(1).join('\n'),
+      autoExtend: product.autoExtend,
+    };
+
+    return renderAccountPage(req, res, next, {
+      section: 'products',
+      extras: {
+        seller: {
+          productForm,
+          editingProductId: product.id,
+          editingProductTitle: product.title,
+          productFlash: {
+            type: 'info',
+            message: 'Đang ở chế độ chỉnh sửa sản phẩm. Sau khi lưu, biểu mẫu sẽ quay về chế độ đăng mới.',
+          },
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;

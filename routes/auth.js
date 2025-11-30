@@ -68,11 +68,26 @@ router.post('/login', async (req, res) => {
     });
   }
 
+  const normalizedStatus = String(user.status || '').toLowerCase();
+  if (normalizedStatus === 'banned') {
+    return res.status(403).render('login/login', {
+      title: 'Đăng nhập',
+      form: {
+        email,
+        remember: Boolean(remember),
+      },
+      errors: {
+        global: 'Tài khoản của bạn tạm khóa! Vui lòng liên hệ admin để khắc phục qua email: example@gmail.com',
+      },
+      returnUrl,
+    });
+  }
+
   const cookieOptions = { httpOnly: true };
   if (remember) {
     cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
   }
-
+  
   res.cookie('userId', user.id, cookieOptions);
   res.redirect(returnUrl || '/account');
 });
@@ -142,19 +157,19 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  // const captchaResult = await verifyRecaptcha(captchaToken, req.ip);
-  // if (!captchaResult.success) {
-  //   errors.recaptcha = captchaResult.error || 'Không thể xác thực reCAPTCHA.';
-  //   return res.status(400).render('login/register', {
-  //     title: 'Đăng ký tài khoản',
-  //     form: {
-  //       name: trimmedName,
-  //       email: trimmedEmail,
-  //       address: trimmedAddress,
-  //     },
-  //     errors,
-  //   });
-  // }
+  const captchaResult = await verifyRecaptcha(captchaToken, req.ip);
+  if (!captchaResult.success) {
+    errors.recaptcha = captchaResult.error || 'Không thể xác thực reCAPTCHA.';
+    return res.status(400).render('login/register', {
+      title: 'Đăng ký tài khoản',
+      form: {
+        name: trimmedName,
+        email: trimmedEmail,
+        address: trimmedAddress,
+      },
+      errors,
+    });
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
   const pending = pendingRegistrations.createPendingRegistration({

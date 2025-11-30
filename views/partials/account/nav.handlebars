@@ -1,41 +1,24 @@
 <nav class="account-tabs" data-account-tabs role="tablist">
-  <a
-    href="/account/profile"
-    class="{{#if (eq currentSection 'profile')}}is-active{{/if}}"
-    data-account-tab
-    data-target="profile"
-    role="tab"
-    aria-selected="{{#if (eq currentSection 'profile')}}true{{else}}false{{/if}}"
-    aria-controls="account-panel-profile"
-  >Thông tin cá nhân</a>
-  <a
-    href="/account/security"
-    class="{{#if (eq currentSection 'security')}}is-active{{/if}}"
-    data-account-tab
-    data-target="security"
-    role="tab"
-    aria-selected="{{#if (eq currentSection 'security')}}true{{else}}false{{/if}}"
-    aria-controls="account-panel-security"
-  >Bảo mật mật khẩu</a>
-  <a
-    href="/account/products"
+  <a href="/account/profile" class="{{#if (eq currentSection 'profile')}}is-active{{/if}}" data-account-tab
+    data-target="profile" role="tab" aria-selected="{{#if (eq currentSection 'profile')}}true{{else}}false{{/if}}"
+    aria-controls="account-panel-profile">Thông tin cá nhân</a>
+  <a href="/account/security" class="{{#if (eq currentSection 'security')}}is-active{{/if}}" data-account-tab
+    data-target="security" role="tab" aria-selected="{{#if (eq currentSection 'security')}}true{{else}}false{{/if}}"
+    aria-controls="account-panel-security">Bảo mật mật khẩu</a>
+  {{#if isBidder}}
+  <a href="/account/watchlist" class="{{#if (eq currentSection 'watchlist')}}is-active{{/if}}" data-account-tab
+    data-target="watchlist" role="tab" aria-selected="{{#if (eq currentSection 'watchlist')}}true{{else}}false{{/if}}"
+    aria-controls="account-panel-watchlist">Watchlist</a>
+  {{/if}}
+  <a href="/account/products"
     class="{{#if (eq currentSection 'products')}}is-active{{/if}} {{#unless isSeller}}is-disabled{{/unless}}"
-    data-account-tab
-    data-target="products"
-    role="tab"
+    data-account-tab data-target="products" role="tab"
     aria-selected="{{#if (eq currentSection 'products')}}true{{else}}false{{/if}}"
-    aria-controls="account-panel-products"
-    {{#unless isSeller}}aria-disabled="true" tabindex="-1" style="cursor: not-allowed !important;" {{/unless}}
-  >Quản lí sản phẩm</a>
+    aria-controls="account-panel-products" {{#unless isSeller}}aria-disabled="true" tabindex="-1"
+    style="cursor: not-allowed !important;" {{/unless}}>Quản lí sản phẩm</a>
   {{#if isAdmin}}
-    <a
-      href="/account/admin"
-      class="{{#if (eq currentSection 'admin')}}is-active{{/if}}"
-      data-account-tab
-      data-target="admin"
-      role="tab"
-      aria-selected="{{#if (eq currentSection 'admin')}}true{{else}}false{{/if}}"
-      aria-controls="account-panel-admin"
-    >Bảng quản trị</a>
+  <a href="/account/admin" class="{{#if (eq currentSection 'admin')}}is-active{{/if}}" data-account-tab
+    data-target="admin" role="tab" aria-selected="{{#if (eq currentSection 'admin')}}true{{else}}false{{/if}}"
+    aria-controls="account-panel-admin">Bảng quản trị</a>
   {{/if}}
 </nav>
