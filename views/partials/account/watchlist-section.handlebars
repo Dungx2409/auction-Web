@@ -7,6 +7,14 @@
       {{/each}}
     </div>
   {{else}}
-    <p>Chưa có sản phẩm nào trong danh sách theo dõi.</p>
+    {{#if seller.watchlist.length}}
+      <div class="product-grid">
+        {{#each seller.watchlist}}
+          {{> product-card product}}
+        {{/each}}
+      </div>
+    {{else}}
+      <p>Chưa có sản phẩm nào trong danh sách theo dõi.</p>
+    {{/if}}
   {{/if}}
 </section>

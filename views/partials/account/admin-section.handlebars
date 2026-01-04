@@ -5,16 +5,169 @@
       <div><strong>{{admin.stats.totalProducts}}</strong><span> Sản phẩm</span></div>
       <div><strong>{{admin.stats.totalCategories}}</strong><span> Danh mục con</span></div>
       <div><strong>{{admin.stats.totalUsers}}</strong><span> Người dùng</span></div>
+      <div class="{{#if admin.stats.pendingUpgradeRequests}}has-pending{{/if}}">
+        <strong>{{admin.stats.pendingUpgradeRequests}}</strong><span> Yêu cầu nâng cấp</span>
+      </div>
     </div>
   </header>
 
+  {{#if admin.upgradeRequests.length}}
+  <div class="admin-upgrade-requests" data-admin-upgrade-requests>
+    <div class="admin-upgrade-header">
+      <h3>Yêu cầu nâng cấp tài khoản chờ duyệt</h3>
+      <span class="upgrade-count-badge">{{admin.upgradeRequests.length}}</span>
+    </div>
+    <div class="admin-upgrade-list">
+      {{#each admin.upgradeRequests}}
+      <div class="admin-upgrade-card" data-upgrade-request data-request-id="{{id}}" data-user-id="{{userId}}">
+        <div class="upgrade-card-header">
+          <div class="upgrade-user-info">
+            <strong class="upgrade-user-name">{{user.name}}</strong>
+            <span class="upgrade-user-email">{{user.email}}</span>
+          </div>
+          <div class="upgrade-user-rating">
+            <span class="rating-badge">
+              {{#if user.ratingPlus}}+{{user.ratingPlus}}{{else}}0{{/if}} / 
+              {{#if user.ratingMinus}}-{{user.ratingMinus}}{{else}}0{{/if}}
+            </span>
+          </div>
+        </div>
+        <div class="upgrade-card-meta">
+          <span class="upgrade-date">Gửi lúc: {{formatDate requestDate 'DD/MM/YYYY HH:mm'}}</span>
+          <span class="upgrade-member-since">Thành viên từ: {{formatDate user.createdAt 'DD/MM/YYYY'}}</span>
+        </div>
+        <div class="upgrade-card-actions">
+          <button type="button" class="btn-approve" data-upgrade-approve data-request-id="{{id}}">
+            ✓ Phê duyệt
+          </button>
+          <button type="button" class="btn-reject" data-upgrade-reject data-request-id="{{id}}">
+            ✕ Từ chối
+          </button>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+  {{/if}}
+
+  <!-- Category Management Section -->
+  <div class="admin-category-management" data-admin-categories>
+    <div class="admin-category-header">
+      <h3>Quản lý danh mục</h3>
+      <button type="button" class="btn primary btn-add-category" data-category-add-root>
+        + Thêm danh mục cha
+      </button>
+    </div>
+
+    <div class="admin-category-list">
+      {{#each admin.categoriesForAdmin}}
+      <div class="admin-category-item is-parent" data-category-item data-category-id="{{id}}">
+        <div class="category-item-header">
+          <div class="category-item-info">
+            <span class="category-icon">📁</span>
+            <strong class="category-name">{{name}}</strong>
+            <span class="category-stats">
+              {{#if totalProductCount}}({{totalProductCount}} sản phẩm){{else}}(0 sản phẩm){{/if}}
+            </span>
+          </div>
+          <div class="category-item-actions">
+            <button type="button" class="btn-icon btn-add-child" data-category-add-child data-parent-id="{{id}}" data-parent-name="{{name}}" title="Thêm danh mục con">
+              ➕
+            </button>
+            <button type="button" class="btn-icon btn-edit" data-category-edit data-category-id="{{id}}" data-category-name="{{name}}" data-category-description="{{description}}" title="Sửa">
+              ✏️
+            </button>
+            <button type="button" class="btn-icon btn-delete" data-category-delete data-category-id="{{id}}" data-category-name="{{name}}" {{#if children.length}}disabled title="Xóa danh mục con trước"{{else}}{{#if productCount}}disabled title="Có sản phẩm trong danh mục"{{else}}title="Xóa"{{/if}}{{/if}}>
+              🗑️
+            </button>
+          </div>
+        </div>
+        {{#if children.length}}
+        <div class="category-children">
+          {{#each children}}
+          <div class="admin-category-item is-child" data-category-item data-category-id="{{id}}" data-parent-id="{{../id}}">
+            <div class="category-item-header">
+              <div class="category-item-info">
+                <span class="category-icon">📄</span>
+                <span class="category-name">{{name}}</span>
+                <span class="category-stats">
+                  {{#if productCount}}({{productCount}} sản phẩm){{else}}(0 sản phẩm){{/if}}
+                </span>
+              </div>
+              <div class="category-item-actions">
+                <button type="button" class="btn-icon btn-edit" data-category-edit data-category-id="{{id}}" data-category-name="{{name}}" data-category-description="{{description}}" data-parent-id="{{../id}}" title="Sửa">
+                  ✏️
+                </button>
+                <button type="button" class="btn-icon btn-delete" data-category-delete data-category-id="{{id}}" data-category-name="{{name}}" {{#if productCount}}disabled title="Có sản phẩm trong danh mục"{{else}}title="Xóa"{{/if}}>
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+      </div>
+      {{else}}
+      <p class="admin-category-empty">Chưa có danh mục nào. Hãy thêm danh mục đầu tiên!</p>
+      {{/each}}
+    </div>
+  </div>
+
+  <!-- Category Modal -->
+  <div class="modal-overlay" data-category-modal hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 data-category-modal-title>Thêm danh mục</h3>
+        <button type="button" class="modal-close" data-category-modal-close>&times;</button>
+      </div>
+      <form class="modal-body" data-category-form>
+        <input type="hidden" name="categoryId" data-category-form-id>
+        <input type="hidden" name="parentId" data-category-form-parent-id>
+        
+        <div class="form-group">
+          <label for="categoryName">Tên danh mục <span class="required">*</span></label>
+          <input type="text" id="categoryName" name="name" data-category-form-name required maxlength="100" placeholder="Nhập tên danh mục">
+        </div>
+        
+        <div class="form-group" data-category-parent-group>
+          <label for="categoryParent">Danh mục cha</label>
+          <select id="categoryParent" name="parentSelect" data-category-form-parent-select>
+            <option value="">— Không (danh mục cấp 1) —</option>
+            {{#each admin.parentCategories}}
+            <option value="{{id}}">{{name}}</option>
+            {{/each}}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="categoryDescription">Mô tả</label>
+          <textarea id="categoryDescription" name="description" data-category-form-description rows="3" maxlength="500" placeholder="Mô tả ngắn về danh mục (tùy chọn)"></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn secondary" data-category-modal-close>Hủy</button>
+          <button type="submit" class="btn primary" data-category-form-submit>Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="admin-management" data-admin-management>
-    <div class="admin-users-panel">
+    <!-- User List Panel -->
+    <div class="admin-users-panel" data-admin-users-panel>
+      <div class="admin-panel-header">
+        <h3>Quản lý người dùng</h3>
+      </div>
       <div class="admin-user-filters" data-admin-filter-group>
-        <button type="button" class="admin-user-filter is-active" data-admin-filter="all">Tất cả ({{admin.userCounts.all}})</button>
-        <button type="button" class="admin-user-filter" data-admin-filter="admin">Admin ({{admin.userCounts.admin}})</button>
-        <button type="button" class="admin-user-filter" data-admin-filter="seller">Seller ({{admin.userCounts.seller}})</button>
-        <button type="button" class="admin-user-filter" data-admin-filter="bidder">Bidder ({{admin.userCounts.bidder}})</button>
+        <button type="button" class="admin-user-filter is-active" data-admin-filter="all">Tất cả
+          ({{admin.userCounts.all}})</button>
+        <button type="button" class="admin-user-filter" data-admin-filter="admin">Admin
+          ({{admin.userCounts.admin}})</button>
+        <button type="button" class="admin-user-filter" data-admin-filter="seller">Seller
+          ({{admin.userCounts.seller}})</button>
+        <button type="button" class="admin-user-filter" data-admin-filter="bidder">Bidder
+          ({{admin.userCounts.bidder}})</button>
       </div>
 
       <div class="admin-user-table-wrapper">
@@ -22,88 +175,128 @@
           <thead>
             <tr>
               <th>Tên</th>
-              <th>Email</th>
               <th>Vai trò</th>
+              <th>Email</th>
               <th>Trạng thái</th>
               <th>Ngày tham gia</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {{#each admin.users}}
-              <tr
-                class="admin-user-row{{#if (eq status 'banned')}} is-banned{{/if}}"
-                data-admin-user
-                data-user-id="{{id}}"
-                data-role="{{role}}"
-                data-user-name="{{name}}"
-                data-user-email="{{email}}"
-                data-user-role-label="{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}"
-                data-user-status="{{status}}"
-                tabindex="0"
-              >
-                <td>
-                  <span class="admin-user-name">{{name}}</span>
-                  <span class="admin-user-badge role-{{role}}">{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}</span>
-                </td>
-                <td>{{email}}</td>
-                <td>{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}</td>
-                <td>
-                  <span class="admin-user-status admin-user-status--{{status}}">
-                    {{#if (eq status 'banned')}}
-                      Locked
-                    {{else}}
-                      {{#if (eq status 'pending')}}
-                        Pending approval
-                      {{else}}
-                        Active
-                      {{/if}}
-                    {{/if}}
-                  </span>
-                </td>
-                <td>{{formatDate createdAt 'DD/MM/YYYY'}}</td>
-              </tr>
+            <tr class="admin-user-row{{#if (eq status 'banned')}} is-banned{{/if}}" data-admin-user
+              data-user-id="{{id}}" data-role="{{role}}" data-user-name="{{name}}" data-user-email="{{email}}"
+              data-user-role-label="{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}"
+              data-user-status="{{status}}" tabindex="0">
+              <td>
+                <span class="admin-user-name">{{name}}</span>
+              </td>
+              <td>{{#if (eq role 'admin')}}Admin{{else}}{{#if (eq role 'seller')}}Seller{{else}}Bidder{{/if}}{{/if}}
+              </td>
+              <td>{{email}}</td>
+              <td>
+                <span class="admin-user-status admin-user-status--{{status}}">
+                  {{#if (eq status 'banned')}}
+                  Locked
+                  {{else}}
+                  {{#if (eq status 'pending')}}
+                  Pending approval
+                  {{else}}
+                  Active
+                  {{/if}}
+                  {{/if}}
+                </span>
+              </td>
+              <td>{{formatDate createdAt 'DD/MM/YYYY'}}</td>
+              <td>
+                <button type="button" class="btn-view-detail" data-view-user-detail data-user-id="{{id}}">
+                  Xem chi tiết →
+                </button>
+              </td>
+            </tr>
             {{/each}}
           </tbody>
         </table>
       </div>
     </div>
 
-    <div class="admin-user-detail" data-admin-user-detail hidden>
-      <div class="admin-user-summary">
-        <div>
-          <h3 data-admin-user-name>Chọn người dùng</h3>
-          <p data-admin-user-email>—</p>
+    <!-- User Detail Panel (Full Width - Hidden by default) -->
+    <div class="admin-user-detail-full" data-admin-user-detail hidden>
+      <div class="admin-detail-header">
+        <button type="button" class="btn-back" data-admin-back-to-list>
+          ← Quay lại danh sách
+        </button>
+      </div>
+      
+      <div class="admin-user-card">
+        <div class="admin-user-summary">
+          <div class="user-info-main">
+            <h3 data-admin-user-name>Chọn người dùng</h3>
+            <p data-admin-user-email>—</p>
+          </div>
+          <div class="admin-user-tags">
+            <span class="role-badge" data-admin-user-role>—</span>
+            <span class="status-badge" data-admin-user-status>—</span>
+          </div>
         </div>
-        <div class="admin-user-tags">
-          <span class="role-badge" data-admin-user-role>—</span>
-          <span class="status-badge" data-admin-user-status>—</span>
+        <div class="admin-user-actions" data-admin-user-actions hidden>
+          <button type="button" class="btn secondary" data-admin-user-reset-password>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Reset mật khẩu
+          </button>
+          <button type="button" class="btn danger" data-admin-user-ban>Khoá tài khoản</button>
+          <button type="button" class="btn success" data-admin-user-unban hidden>Mở khoá tài khoản</button>
         </div>
       </div>
-      <div class="admin-user-actions" data-admin-user-actions hidden>
-        <button type="button" class="btn-secondary" data-admin-user-ban>Khoá tài khoản</button>
-        <button type="button" class="btn-secondary" data-admin-user-unban hidden>Mở khoá tài khoản</button>
-      </div>
-      <p class="admin-user-placeholder" data-admin-user-placeholder>
-        Chọn một người dùng để xem chi tiết và quản lý hoạt động của họ.
-      </p>
-      <div class="admin-user-products" data-admin-user-products hidden>
-        <div class="admin-user-products-header">
-          <h4 data-admin-user-products-title>Quản lí hoạt động</h4>
-          <p data-admin-user-products-description>Gỡ sản phẩm vi phạm để dừng hiển thị trên sàn đấu giá.</p>
+
+      <div class="admin-user-products-section">
+        <p class="admin-user-placeholder" data-admin-user-placeholder>
+          Đang tải dữ liệu...
+        </p>
+        <div class="admin-user-products" data-admin-user-products hidden>
+          <div class="admin-user-products-header">
+            <h4 data-admin-user-products-title>Quản lí hoạt động</h4>
+            <p data-admin-user-products-description>Gỡ sản phẩm vi phạm để dừng hiển thị trên sàn đấu giá.</p>
+          </div>
+          <div class="admin-products-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Trạng thái</th>
+                  <th>Giá hiện tại</th>
+                  <th>Lượt đấu</th>
+                  <th>Kết thúc</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody data-admin-user-products-body></tbody>
+            </table>
+          </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Sản phẩm</th>
-              <th>Trạng thái</th>
-              <th>Giá hiện tại</th>
-              <th>Lượt đấu</th>
-              <th>Kết thúc</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody data-admin-user-products-body></tbody>
-        </table>
+
+        <!-- Seller's bidding products (shown only for sellers) -->
+        <div class="admin-user-bidding-products" data-admin-user-bidding-products hidden>
+          <div class="admin-user-products-header">
+            <h4>Các phiên đấu giá đã tham gia</h4>
+            <p>Danh sách sản phẩm mà người bán này đã ra giá.</p>
+          </div>
+          <div class="admin-products-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Trạng thái</th>
+                  <th>Giá hiện tại</th>
+                  <th>Giá đã đặt</th>
+                  <th>Lượt đấu</th>
+                  <th>Kết thúc</th>
+                </tr>
+              </thead>
+              <tbody data-admin-user-bidding-body></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>

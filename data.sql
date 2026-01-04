@@ -140,6 +140,24 @@ CREATE TABLE auction.bid_rejections (
 );
 COMMENT ON TABLE auction.bid_rejections IS 'Người bán có thể từ chối 1 bidder cho sản phẩm';
 
+-- Bid participation approval workflow for unrated bidders
+CREATE TABLE auction.bid_requests (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id BIGINT NOT NULL REFERENCES auction.products(id) ON DELETE CASCADE,
+  bidder_id BIGINT NOT NULL REFERENCES auction.users(id) ON DELETE CASCADE,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending', -- pending/approved/rejected
+  message TEXT,
+  seller_note TEXT,
+  approved_by BIGINT REFERENCES auction.users(id) ON DELETE SET NULL,
+  responded_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (product_id, bidder_id)
+);
+COMMENT ON TABLE auction.bid_requests IS 'Yêu cầu tham gia đấu giá của bidder chưa có đánh giá';
+CREATE INDEX idx_bid_requests_status ON auction.bid_requests (status);
+CREATE INDEX idx_bid_requests_product ON auction.bid_requests (product_id, status);
+
 -- 7. Watchlist & Q&A
 CREATE TABLE auction.watchlists (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -294,6 +312,8 @@ FOR EACH ROW EXECUTE PROCEDURE auction.set_updated_at();
 CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON auction.products
 FOR EACH ROW EXECUTE PROCEDURE auction.set_updated_at();
 CREATE TRIGGER trg_orders_updated_at BEFORE UPDATE ON auction.orders
+FOR EACH ROW EXECUTE PROCEDURE auction.set_updated_at();
+CREATE TRIGGER trg_bid_requests_updated_at BEFORE UPDATE ON auction.bid_requests
 FOR EACH ROW EXECUTE PROCEDURE auction.set_updated_at();
 
 -- 15. Policies / Notes printed for developer

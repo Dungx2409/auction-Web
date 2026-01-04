@@ -1,10 +1,27 @@
 <article class="product-detail">
   <div class="product-media">
-    <div class="gallery">
-      <img class="main" src="{{product.images.[0]}}" alt="{{product.title}}" />
+    <div class="gallery slideshow" data-slideshow>
+      <div class="slideshow-main">
+        <button type="button" class="slideshow-arrow slideshow-prev" data-slide="prev" aria-label="Ảnh trước">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="slideshow-viewport">
+          {{#each product.images}}
+          <img class="slideshow-slide{{#if @first}} is-active{{/if}}" src="{{this}}" alt="{{../product.title}}" data-index="{{@index}}" />
+          {{/each}}
+        </div>
+        <button type="button" class="slideshow-arrow slideshow-next" data-slide="next" aria-label="Ảnh tiếp">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+      <div class="slideshow-indicators">
+        {{#each product.images}}
+        <button type="button" class="slideshow-dot{{#if @first}} is-active{{/if}}" data-goto="{{@index}}" aria-label="Xem ảnh {{add @index 1}}"></button>
+        {{/each}}
+      </div>
       <div class="thumbs">
         {{#each product.images}}
-        <img src="{{this}}" alt="{{../product.title}} thumbnail" />
+        <img src="{{this}}" alt="{{../product.title}} thumbnail" class="{{#if @first}}is-active{{/if}}" data-thumb="{{@index}}" />
         {{/each}}
       </div>
     </div>
@@ -32,10 +49,23 @@
       </div>
 
       <div class="media-tabs__panel is-active" data-tab-panel="seller" role="tabpanel">
-        <h3>Người bán {{maskName product.seller.name}}</h3>
+        <h3>Người bán 
+          {{#if isSellerOfProduct}}
+            {{product.seller.name}} (Bạn)
+          {{else}}
+            <a href="/users/{{product.seller.id}}/ratings" class="seller-profile-link">{{product.seller.name}}</a>
+          {{/if}}
+        </h3>
         <ul>
-          <li>Đánh giá: {{product.seller.ratingPlus}} 👍 / {{product.seller.ratingMinus}} 👎
-            ({{product.seller.ratingScore}}%)</li>
+          <li>Đánh giá: 
+            {{#unless isSellerOfProduct}}
+              <a href="/users/{{product.seller.id}}/ratings">
+            {{/unless}}
+            {{product.seller.ratingPlus}} 👍 / {{product.seller.ratingMinus}} 👎 ({{product.seller.ratingScore}}%)
+            {{#unless isSellerOfProduct}}
+              </a>
+            {{/unless}}
+          </li>
           <li>Phản hồi trong: {{product.seller.responseTime}}</li>
           <li>Huy hiệu: {{#each product.seller.badges}}<span class="badge">{{this}}</span>{{/each}}</li>
         </ul>
@@ -83,6 +113,39 @@
       {{/if}}
     </div>
 
+    {{#if buyNowContext}}
+    <section class="buy-now-offer" aria-labelledby="buy-now-offer-title">
+      <div class="buy-now-offer__info">
+        <p id="buy-now-offer-title" class="buy-now-offer__label">Chốt giá ngay</p>
+        <strong class="buy-now-offer__price">{{buyNowContext.priceFormatted}}</strong>
+        <small>Ngừng đấu giá ngay khi bạn xác nhận Mua ngay.</small>
+      </div>
+      <div class="buy-now-offer__actions">
+        {{#if buyNowContext.canBuy}}
+        <button
+          type="button"
+          class="btn primary btn-pill buy-now-offer__button"
+          data-buy-now
+          data-product-id="{{product.id}}"
+          data-buy-price="{{buyNowContext.price}}"
+        >Mua ngay</button>
+        <p class="buy-now-offer__note">Người đầu tiên chọn Mua ngay sẽ thắng sản phẩm và được chuyển tới bước thanh toán.</p>
+        {{else if buyNowContext.requiresLogin}}
+        <a class="btn secondary btn-pill buy-now-offer__button" href="{{buyNowContext.loginUrl}}">Đăng nhập để Mua
+          ngay</a>
+        {{#if buyNowContext.note}}
+        <p class="buy-now-offer__note">{{buyNowContext.note}}</p>
+        {{/if}}
+        {{else}}
+        <button type="button" class="btn btn-pill buy-now-offer__button" disabled>{{buyNowContext.disabledLabel}}</button>
+        {{#if buyNowContext.note}}
+        <p class="buy-now-offer__note">{{buyNowContext.note}}</p>
+        {{/if}}
+        {{/if}}
+      </div>
+    </section>
+    {{/if}}
+
     {{#if auctionClosed}}
     <div class="auction-status-banner" role="status">
       <strong>Không thể tiếp tục đặt giá</strong>
@@ -116,6 +179,15 @@
       <div class="bid-entry">
         <label for="bid-amount-{{product.id}}">Nhập giá bạn muốn đặt</label>
         <div class="bid-entry-control">
+          <button
+            type="button"
+            class="bid-step-btn bid-step-btn--decrease"
+            data-bid-decrease
+            {{#unless bidContext.canBid}}disabled{{/unless}}
+            aria-label="Giảm giá"
+          >
+            <i class="bi bi-dash-lg"></i>
+          </button>
           <span>₫</span>
           <input
             id="bid-amount-{{product.id}}"
@@ -130,6 +202,15 @@
             {{#unless bidContext.canBid}}disabled{{/unless}}
             data-bid-input
           />
+          <button
+            type="button"
+            class="bid-step-btn bid-step-btn--increase"
+            data-bid-increase
+            {{#unless bidContext.canBid}}disabled{{/unless}}
+            aria-label="Tăng giá"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
         </div>
       </div>
 
@@ -140,13 +221,40 @@
         {{#if bidContext.showRatingNotice}}
           <p class="bid-notice bid-notice--warning">{{bidContext.ratingRuleMessage}}</p>
         {{/if}}
-        {{#if bidContext.showExceptionNote}}
-          <p class="bid-notice bid-notice--info">Bạn chưa có đánh giá nhưng người bán đã cho phép tài khoản mới đặt giá.</p>
+        {{#if bidContext.needsApproval}}
+          {{#if (eq bidContext.approvalStatus 'approved')}}
+            <p class="bid-notice bid-notice--success">Người bán đã chấp thuận yêu cầu của bạn. Bạn có thể đặt giá ngay bây giờ.</p>
+          {{else if bidContext.pendingApproval}}
+            <p class="bid-notice bid-notice--info">Yêu cầu của bạn đang chờ người bán phê duyệt. Hãy quay lại sau ít phút.</p>
+          {{else if bidContext.approvalDenied}}
+            <p class="bid-notice bid-notice--warning">Yêu cầu trước đó bị từ chối. Bạn có thể gửi lại với lời nhắn thuyết phục hơn.</p>
+          {{else}}
+            <p class="bid-notice bid-notice--muted">Bạn chưa có đánh giá nào nên cần xin phép người bán trước khi đặt giá.</p>
+          {{/if}}
         {{/if}}
         {{#if bidContext.ratingPercent}}
           <p class="bid-notice bid-notice--meta">Điểm hiện tại: {{bidContext.ratingPercent}}% ({{bidContext.ratingPlus}} / {{add bidContext.ratingPlus bidContext.ratingMinus}} lần đánh giá)</p>
         {{/if}}
       </div>
+
+      {{#if bidContext.needsApproval}}
+        {{#unless (eq bidContext.approvalStatus 'approved')}}
+        <div class="bid-request-box" data-bid-request-panel>
+          {{#if bidContext.canRequestApproval}}
+            <label for="bid-request-note-{{product.id}}">Gửi lời nhắn cho người bán (tuỳ chọn)</label>
+            <textarea id="bid-request-note-{{product.id}}" rows="2" data-bid-request-message placeholder="Ví dụ: Tôi thật sự quan tâm sản phẩm và xin được tham gia đấu giá."></textarea>
+            <button
+              type="button"
+              class="btn secondary btn-pill"
+              data-bid-request
+              data-product-id="{{product.id}}"
+            >{{#if bidContext.approvalDenied}}Gửi lại yêu cầu{{else}}Gửi yêu cầu tham gia đấu giá{{/if}}</button>
+          {{else if bidContext.pendingApproval}}
+            <p class="bid-notice bid-notice--info">Yêu cầu đang được xử lý. Bạn sẽ nhận được thông báo sau khi người bán phản hồi.</p>
+          {{/if}}
+        </div>
+        {{/unless}}
+      {{/if}}
 
       <div class="bid-button-row">
         <button
@@ -177,6 +285,50 @@
           <span class="watch-count">{{#if product.watchers}}{{product.watchers}}{{else}}0{{/if}}</span>
         </button>
       </div>
+
+      {{!-- Auto-bid Section --}}
+      {{#if bidContext.canBid}}
+      <div class="auto-bid-section" data-auto-bid-section>
+        <div class="auto-bid-toggle">
+          <button type="button" class="btn tertiary btn-pill auto-bid-toggle-btn" data-auto-bid-toggle>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Đấu giá tự động</span>
+          </button>
+        </div>
+        <div class="auto-bid-form" data-auto-bid-form hidden>
+          <div class="auto-bid-info">
+            <p class="auto-bid-description">Hệ thống sẽ tự động đặt giá thay bạn với mức giá vừa đủ để thắng, cho đến khi đạt giá tối đa.</p>
+          </div>
+          <div class="auto-bid-input-group">
+            <label for="auto-bid-max-price">Giá tối đa của bạn</label>
+            <div class="auto-bid-input-wrapper">
+              <input 
+                type="text" 
+                id="auto-bid-max-price" 
+                class="auto-bid-input"
+                data-auto-bid-input
+                data-product-id="{{product.id}}"
+                {{#if bidContext.nextMinimumBid}}data-min-bid="{{bidContext.nextMinimumBid}}"{{/if}}
+                {{#if bidContext.bidStep}}data-bid-step="{{bidContext.bidStep}}"{{/if}}
+                placeholder="Nhập giá tối đa"
+                inputmode="numeric"
+              />
+              <span class="auto-bid-currency">₫</span>
+            </div>
+            <p class="auto-bid-hint">Tối thiểu: <span data-auto-bid-min>{{formatCurrency bidContext.nextMinimumBid}}</span></p>
+          </div>
+          <div class="auto-bid-status" data-auto-bid-status hidden>
+            <span class="auto-bid-status-icon">✓</span>
+            <span class="auto-bid-status-text">Đấu giá tự động đang hoạt động với giá tối đa: <strong data-auto-bid-current-max>—</strong></span>
+          </div>
+          <div class="auto-bid-actions">
+            <button type="button" class="btn primary btn-pill" data-auto-bid-submit>Kích hoạt đấu giá tự động</button>
+            <button type="button" class="btn tertiary btn-pill" data-auto-bid-cancel hidden>Hủy đấu giá tự động</button>
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
     </section>
     {{/if}}
 
@@ -222,14 +374,54 @@
         <th>Thời điểm</th>
         <th>Người mua</th>
         <th>Giá</th>
+        {{#if isSellerOfProduct}}
+        <th>Thao tác</th>
+        {{/if}}
       </tr>
     </thead>
     <tbody data-bid-history>
       {{#each product.bids}}
-      <tr>
+      <tr data-bid-row data-bidder-id="{{bidderId}}" {{#if isRejected}}class="is-rejected"{{/if}}>
         <td>{{formatDate time}}</td>
-        <td>{{maskName userName}}</td>
+        <td>
+          {{#if ../isSellerOfProduct}}
+            <a href="/users/{{bidderId}}/ratings" class="bidder-profile-link" title="Xem đánh giá">{{maskName userName}}</a>
+            <span class="bidder-rating">({{ratingPlus}}👍/{{ratingMinus}}👎)</span>
+          {{else}}
+            {{maskName userName}}
+          {{/if}}
+          {{#if isRejected}}<span class="badge badge--rejected">Đã từ chối</span>{{/if}}
+        </td>
         <td>{{formatCurrency amount}}</td>
+        {{#if ../isSellerOfProduct}}
+        <td class="bid-actions">
+          {{#if isRejected}}
+          <button
+            type="button"
+            class="btn btn-sm btn-unreject-bidder"
+            data-unreject-bidder
+            data-product-id="{{../product.id}}"
+            data-bidder-id="{{bidderId}}"
+            data-bidder-name="{{maskName userName}}"
+            title="Hoàn tác từ chối"
+          >
+            <i class="bi bi-arrow-counterclockwise"></i> Hoàn tác
+          </button>
+          {{else}}
+          <button
+            type="button"
+            class="btn btn-sm danger btn-reject-bidder"
+            data-reject-bidder
+            data-product-id="{{../product.id}}"
+            data-bidder-id="{{bidderId}}"
+            data-bidder-name="{{maskName userName}}"
+            title="Từ chối người mua này"
+          >
+            <i class="bi bi-x-circle"></i> Từ chối
+          </button>
+          {{/if}}
+        </td>
+        {{/if}}
       </tr>
       {{/each}}
     </tbody>
@@ -240,7 +432,6 @@
   <header class="qa-header">
     <div>
       <h2>Hỏi & đáp</h2>
-      {{!-- <p class="qa-subtitle">{{product.questions.length}} bình luận công khai</p> --}}
     </div>
     {{#if qaStatus.error}}
     <div class="qa-alert qa-alert--error">

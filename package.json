@@ -10,14 +10,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
+    "bootstrap-icons": "^1.13.1",
     "cookie-parser": "^1.4.6",
     "dayjs": "^1.11.19",
     "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "express-handlebars": "^7.0.0",
     "knex": "^3.1.0",
+    "multer": "^1.4.5-lts.1",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.14",
     "pg": "^8.11.5",
     "y": "^0.3.2"
   },

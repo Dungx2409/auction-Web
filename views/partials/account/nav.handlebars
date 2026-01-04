@@ -5,7 +5,12 @@
   <a href="/account/security" class="{{#if (eq currentSection 'security')}}is-active{{/if}}" data-account-tab
     data-target="security" role="tab" aria-selected="{{#if (eq currentSection 'security')}}true{{else}}false{{/if}}"
     aria-controls="account-panel-security">Bảo mật mật khẩu</a>
-  {{#if isBidder}}
+  {{#if (or isBidder isSeller)}}
+  <a href="/account/bidding" class="{{#if (eq currentSection 'bidding')}}is-active{{/if}}" data-account-tab
+    data-target="bidding" role="tab" aria-selected="{{#if (eq currentSection 'bidding')}}true{{else}}false{{/if}}"
+    aria-controls="account-panel-bidding">Phiên đấu giá</a>
+  {{/if}}
+  {{#if hasWatchlist}}
   <a href="/account/watchlist" class="{{#if (eq currentSection 'watchlist')}}is-active{{/if}}" data-account-tab
     data-target="watchlist" role="tab" aria-selected="{{#if (eq currentSection 'watchlist')}}true{{else}}false{{/if}}"
     aria-controls="account-panel-watchlist">Watchlist</a>

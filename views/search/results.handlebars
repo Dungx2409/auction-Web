@@ -1,22 +1,13 @@
 <section class="page-heading">
   <h1>Kết quả tìm kiếm</h1>
-  <p>{{total}} kết quả cho "{{query}}"</p>
+  <p>{{total}} kết quả{{#if query}} cho "{{query}}"{{/if}}</p>
 </section>
 
 <form class="filter-bar" method="get">
   <input type="hidden" name="q" value="{{query}}" />
-  <label>Danh mục
-    <select name="category" onchange="this.form.submit()">
-      <option value="">Tất cả</option>
-      {{#each site.categories}}
-        {{#each children}}
-          <option value="{{id}}" {{#if (eq ../selectedCategory id)}}selected{{/if}}>{{../name}} ➝ {{name}}</option>
-        {{/each}}
-      {{/each}}
-    </select>
-  </label>
   <label>Sắp xếp
     <select name="sort" onchange="this.form.submit()">
+      <option value="relevance" {{#if (eq sort 'relevance')}}selected{{/if}}>Độ liên quan</option>
       <option value="endingSoon" {{#if (eq sort 'endingSoon')}}selected{{/if}}>Kết thúc sớm nhất</option>
       <option value="priceAsc" {{#if (eq sort 'priceAsc')}}selected{{/if}}>Giá tăng dần</option>
       <option value="priceDesc" {{#if (eq sort 'priceDesc')}}selected{{/if}}>Giá giảm dần</option>
@@ -31,6 +22,18 @@
       {{> product-card}}
     {{/each}}
   </div>
+
+  {{#if (gt totalPages 1)}}
+  <div class="pagination">
+    {{#if hasPrevPage}}
+      <a href="?q={{query}}&page={{subtract page 1}}&sort={{sort}}{{#if selectedCategory}}&category={{selectedCategory}}{{/if}}">← Trang trước</a>
+    {{/if}}
+    <span>Trang {{page}} / {{totalPages}}</span>
+    {{#if hasNextPage}}
+      <a href="?q={{query}}&page={{add page 1}}&sort={{sort}}{{#if selectedCategory}}&category={{selectedCategory}}{{/if}}">Trang tiếp →</a>
+    {{/if}}
+  </div>
+  {{/if}}
 {{else}}
-  <p>Không tìm thấy sản phẩm phù hợp. Vui lòng thử từ khóa khác.</p>
+  <p class="no-results">Không tìm thấy sản phẩm phù hợp. Vui lòng thử từ khóa khác.</p>
 {{/if}}

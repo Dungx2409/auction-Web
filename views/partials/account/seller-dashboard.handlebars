@@ -1,193 +1,348 @@
 <section id="products" class="account-section account-seller">
   <header class="section-header">
     <h2>Kênh người bán</h2>
-    <p>Quản lý sản phẩm, theo dõi hiệu suất và đăng bán mặt hàng mới.</p>
   </header>
 
   {{#if seller.productFlash}}
     <div class="alert alert-{{seller.productFlash.type}}">{{seller.productFlash.message}}</div>
   {{/if}}
 
-  <div class="account-panel account-panel--products">
-    <div class="account-panel-main">
-      <div class="account-card account-card--form">
-        <h3>{{#if seller.editingProductId}}Chỉnh sửa sản phẩm{{else}}Đăng sản phẩm mới{{/if}}</h3>
-        <form method="post" action="/account/products" class="account-form account-form--product">
-          
-          {{#if seller.editingProductId}}
-            <input type="hidden" name="productId" value="{{seller.editingProductId}}" />
-          {{/if}}
-          <div class="account-form-grid account-form-grid--product">
-            <div class="form-field form-field--full {{#if seller.productErrors.title}}has-error{{/if}}">
-              <label for="product-title">Tên sản phẩm</label>
-              <input id="product-title" type="text" name="title" value="{{seller.productForm.title}}" placeholder="Ví dụ: Máy ảnh Sony A7C II..." required />
-              <p class="field-hint">Tên nên rõ ràng, dài từ 8–120 ký tự.</p>
-              {{#if seller.productErrors.title}}<span class="field-error">{{seller.productErrors.title}}</span>{{/if}}
-            </div>
-
-            <div class="form-field {{#if seller.productErrors.categoryId}}has-error{{/if}}">
-              <label for="product-category">Danh mục</label>
-              <select id="product-category" name="categoryId" required>
-                <option value="">— Chọn danh mục —</option>
-                {{#each seller.categories}}
-                  <option value="{{id}}" {{#if (eq ../seller.productForm.categoryId id)}}selected{{/if}}>{{name}}</option>
-                {{/each}}
-              </select>
-              {{#if seller.productErrors.categoryId}}<span class="field-error">{{seller.productErrors.categoryId}}</span>{{/if}}
-            </div>
-
-            <div class="form-field {{#if seller.productErrors.startPrice}}has-error{{/if}}">
-              <label for="product-start-price">Giá khởi điểm (VND)</label>
-              <input id="product-start-price" type="number" min="0" step="1000" name="startPrice" value="{{seller.productForm.startPrice}}" required />
-              <p class="field-hint">Tối thiểu 1.000₫ và nên phù hợp với giá trị sản phẩm.</p>
-              {{#if seller.productErrors.startPrice}}<span class="field-error">{{seller.productErrors.startPrice}}</span>{{/if}}
-            </div>
-
-            <div class="form-field {{#if seller.productErrors.stepPrice}}has-error{{/if}}">
-              <label for="product-step-price">Bước giá (VND)</label>
-              <input id="product-step-price" type="number" min="0" step="1000" name="stepPrice" value="{{seller.productForm.stepPrice}}" required />
-              <p class="field-hint">Nên lớn hơn 1.000₫ nhưng nhỏ hơn giá khởi điểm để tạo cạnh tranh hợp lý.</p>
-              {{#if seller.productErrors.stepPrice}}<span class="field-error">{{seller.productErrors.stepPrice}}</span>{{/if}}
-            </div>
-
-            <div class="form-field {{#if seller.productErrors.buyNowPrice}}has-error{{/if}}">
-              <label for="product-buy-now">Giá mua ngay (tuỳ chọn)</label>
-              <input id="product-buy-now" type="number" min="0" step="1000" name="buyNowPrice" value="{{seller.productForm.buyNowPrice}}" placeholder="Để trống nếu không dùng" />
-              {{#if seller.productErrors.buyNowPrice}}<span class="field-error">{{seller.productErrors.buyNowPrice}}</span>{{/if}}
-            </div>
-
-            <div class="form-field {{#if seller.productErrors.startDate}}has-error{{/if}}">
-              <label for="product-start-date">Bắt đầu</label>
-              <input id="product-start-date" type="datetime-local" name="startDate" value="{{seller.productForm.startDate}}" required />
-              <p class="field-hint">Chọn thời điểm ít nhất sau hiện tại 15 phút để người mua chuẩn bị.</p>
-              {{#if seller.productErrors.startDate}}<span class="field-error">{{seller.productErrors.startDate}}</span>{{/if}}
-            </div>
-
-            <div class="form-field {{#if seller.productErrors.endDate}}has-error{{/if}}">
-              <label for="product-end-date">Kết thúc</label>
-              <input id="product-end-date" type="datetime-local" name="endDate" value="{{seller.productForm.endDate}}" required />
-              <p class="field-hint">Phiên nên kéo dài ít nhất 1 giờ nhưng không quá 30 ngày.</p>
-              {{#if seller.productErrors.endDate}}<span class="field-error">{{seller.productErrors.endDate}}</span>{{/if}}
-            </div>
-
-            <div class="form-field form-field--full {{#if seller.productErrors.shortDescription}}has-error{{/if}}">
-              <label for="product-short-description">Mô tả ngắn</label>
-              <textarea id="product-short-description" name="shortDescription" rows="2" placeholder="Tóm tắt điểm nổi bật">{{seller.productForm.shortDescription}}</textarea>
-              <p class="field-hint">Khoảng 30–240 ký tự, tránh dùng ký hiệu khó hiểu.</p>
-              {{#if seller.productErrors.shortDescription}}<span class="field-error">{{seller.productErrors.shortDescription}}</span>{{/if}}
-            </div>
-
-            <div class="form-field form-field--full {{#if seller.productErrors.fullDescription}}has-error{{/if}}">
-              <label for="product-full-description">Mô tả chi tiết</label>
-              <textarea id="product-full-description" name="fullDescription" rows="5" placeholder="Thông số kỹ thuật, tình trạng, phụ kiện đi kèm...">{{seller.productForm.fullDescription}}</textarea>
-              <p class="field-hint">Tối thiểu 80 ký tự sau khi bỏ HTML; hãy cung cấp thông tin rõ ràng.</p>
-              {{#if seller.productErrors.fullDescription}}<span class="field-error">{{seller.productErrors.fullDescription}}</span>{{/if}}
-            </div>
-
-            <div class="form-field form-field--full {{#if seller.productErrors.imageUrl}}has-error{{/if}}{{#if seller.productErrors.imageFile}} has-error{{/if}}">
-              <label for="product-image-url">Ảnh đại diện</label>
-              <input id="product-image-url" type="url" name="imageUrl" value="{{seller.productForm.imageUrl}}" placeholder="Dán link ảnh (https://...)" />
-              <p class="field-hint">Cần một ảnh rõ nét; sử dụng URL trực tiếp hoặc tải lên từ thiết bị.</p>
-              <div class="upload-inline" style="width:20%;">
-              <input id="product-image-file" type="file" name="imageFile" accept="image/*" hidden />
-              <label for="product-image-file" class="btn secondary btn--upload" style="display:block;width:100%;">Chọn ảnh từ thiết bị</label>
-              </div>
-              {{#if seller.productErrors.imageUrl}}<span class="field-error">{{seller.productErrors.imageUrl}}</span>{{/if}}
-              {{#if seller.productErrors.imageFile}}<span class="field-error">{{seller.productErrors.imageFile}}</span>{{/if}}
-            </div>
-            <div class="form-field form-field--full {{#if seller.productErrors.galleryUrls}}has-error{{/if}}{{#if seller.productErrors.galleryFiles}} has-error{{/if}}">
-              <label for="product-gallery-urls">Ảnh bổ sung (ít nhất 3 ảnh)</label>
-              <textarea id="product-gallery-urls" name="galleryUrls" rows="2" placeholder="Mỗi link trên một dòng">{{seller.productForm.galleryUrls}}</textarea>
-              <p class="field-hint">Ít nhất 3 ảnh khác nhau; mỗi dòng một URL hợp lệ.</p>
-              <div class="upload-inline" style="width:20%;">
-              <input id="product-gallery-files" type="file" name="galleryFiles" accept="image/*" multiple hidden />
-              <label for="product-gallery-files" class="btn secondary btn--upload" style="display:block;width:100%;">Chọn ảnh từ thiết bị</label>
-              </div>
-              {{#if seller.productErrors.galleryUrls}}<span class="field-error">{{seller.productErrors.galleryUrls}}</span>{{/if}}
-              {{#if seller.productErrors.galleryFiles}}<span class="field-error">{{seller.productErrors.galleryFiles}}</span>{{/if}}
-            </div>
-            <div class="form-field form-field--inline">
-              <label class="checkbox">
-                <input type="checkbox" name="autoExtend" value="true" {{#if seller.productForm.autoExtend}}checked{{/if}} />
-                <span>Tự động gia hạn phiên khi sắp kết thúc</span>
-              </label>
-              <p class="field-hint">Hệ thống sẽ tự động kéo dài phiên khi còn ít thời gian.</p>
-            </div>
-          </div>
-          <div class="form-actions form-actions--between">
-            {{#if seller.editingProductId}}
-              <a href="/account/products" class="btn tertiary">Huỷ chỉnh sửa</a>
-              <button type="submit" class="btn primary">Cập nhật sản phẩm</button>
-            {{else}}
-              <button type="reset" class="btn tertiary">Làm mới</button>
-              <button type="submit" class="btn primary">Đăng sản phẩm</button>
-            {{/if}}
-          </div>
-        </form>
-      </div>
+  <div class="seller-dashboard-tabs" data-product-tabs>
+    <div class="account-tabs seller-tab-nav" role="tablist">
+      <button type="button" class="is-active" data-tab="create" role="tab" aria-selected="true">
+        Đăng sản phẩm mới
+      </button>
+      <button type="button" data-tab="requests" role="tab" aria-selected="false">
+        Yêu cầu tham gia đấu giá{{#if seller.bidRequests.length}} ({{seller.bidRequests.length}}){{/if}}
+      </button>
+      <button type="button" data-tab="sales" role="tab" aria-selected="false">
+        Quản lý bán hàng
+      </button>
     </div>
 
-    <aside class="account-panel-aside account-panel-aside--products">
-      <div class="account-card account-card--stats">
-        <h3>Tổng quan nhanh</h3>
-        <ul class="seller-stats">
-          <li><span>Đang bán</span><strong>{{seller.stats.active}}</strong></li>
-          <li><span>Bản nháp</span><strong>{{seller.stats.draft}}</strong></li>
-          <li><span>Đã kết thúc</span><strong>{{seller.stats.ended}}</strong></li>
-        </ul>
-      </div>
+    <div class="seller-tab-panels">
+      <section class="seller-tab-panel is-active" data-tab-panel="create" role="tabpanel">
+        <div class="account-panel account-panel--products">
+          <div class="account-panel-main">
+            <div class="account-card account-card--form">
+              <h3>{{#if seller.editingProductId}}Chỉnh sửa sản phẩm{{else}}Đăng sản phẩm mới{{/if}}</h3>
+              <form method="post" action="/account/products" class="account-form account-form--product" enctype="multipart/form-data">
+                {{#if seller.editingProductId}}
+                  <input type="hidden" name="productId" value="{{seller.editingProductId}}" />
+                {{/if}}
+                <div class="account-form-grid account-form-grid--product">
+                  <div class="form-field form-field--full {{#if seller.productErrors.title}}has-error{{/if}}">
+                    <label for="product-title">Tên sản phẩm</label>
+                    <input id="product-title" type="text" name="title" value="{{seller.productForm.title}}" placeholder="Ví dụ: Máy ảnh Sony A7C II..." required data-min-length="8" data-max-length="120" />
+                    <p class="field-hint">Tên nên rõ ràng, dài từ 8–120 ký tự.</p>
+                    {{#if seller.productErrors.title}}<span class="field-error">{{seller.productErrors.title}}</span>{{/if}}
+                  </div>
 
-      <div class="account-card account-card--auto">
-        <h3>Gia hạn tự động</h3>
-        <ul class="settings-list">
-          <li>Kích hoạt khi còn {{seller.autoExtendSettings.triggerMinutes}} phút cuối.</li>
-          <li>Gia hạn thêm {{seller.autoExtendSettings.extendMinutes}} phút.</li>
-        </ul>
-        <p class="field-hint">Bạn có thể tắt tuỳ sản phẩm bằng cách bỏ chọn ở form tạo.</p>
-      </div>
-    </aside>
-  </div>
+                  <div class="form-field {{#if seller.productErrors.categoryId}}has-error{{/if}}">
+                    <label for="product-category">Danh mục</label>
+                    <select id="product-category" name="categoryId" required>
+                      <option value="">— Chọn danh mục —</option>
+                      {{#each seller.categories}}
+                        <option value="{{id}}" {{#if (eq ../seller.productForm.categoryId id)}}selected{{/if}}>{{name}}</option>
+                      {{/each}}
+                    </select>
+                    {{#if seller.productErrors.categoryId}}<span class="field-error">{{seller.productErrors.categoryId}}</span>{{/if}}
+                  </div>
 
-  <div class="account-products-board">
-    <section class="account-products-column">
-      <header>
-        <h3>Đang bán</h3>
-      </header>
-      {{#if seller.activeProducts.length}}
-        <table class="seller-products">
-          <thead>
-            <tr>
-              <th>Tên sản phẩm</th>
-              <th>Giá khởi điểm</th>
-              <th>Giá hiện tại</th>
-              <th>Kết thúc</th>
-              <th>Trạng thái</th>
-              <th>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{#each seller.activeProducts}}
-              <tr>
-                <td class="col-title"><a href="/products/{{id}}">{{title}}</a></td>
-                <td>{{formatCurrency startPrice}}</td>
-                <td>{{formatCurrency currentPrice}}</td>
-                <td>{{#if endDate}}{{formatDate endDate 'HH:mm DD/MM/YYYY'}}{{else}}—{{/if}}</td>
-                <td><span class="status-pill {{statusClass status}}">{{statusLabel status}}</span></td>
-                <td><div class="action-links">
-                  <i class="bi bi-trash">
-                    <a href="/account/products/{{id}}/edit" >Sửa</a>
-                  </i>
-                  <i class="bi bi-trash">
-                  <a href="/account/products/{{id}}/delete" style="color: red;" onclick="return confirm('Bạn có chắc muốn xoá sản phẩm này?');">Xoá</a>
-                  </i>
-                </div></td>
-              </tr>
-            {{/each}}
-          </tbody>
-        </table>
-      {{else}}
-        <p class="empty-state">Chưa có sản phẩm nào đang được đấu giá.</p>
-      {{/if}}
-    </section>
+                  <div class="form-field {{#if seller.productErrors.startPrice}}has-error{{/if}}">
+                    <label for="product-start-price">Giá khởi điểm (VND)</label>
+                    <input id="product-start-price" type="text" inputmode="numeric" name="startPrice" value="{{seller.productForm.startPrice}}" class="currency-input" data-min="1000" required />
+                    <p class="field-hint">Tối thiểu 1.000₫ và nên phù hợp với giá trị sản phẩm.</p>
+                    {{#if seller.productErrors.startPrice}}<span class="field-error">{{seller.productErrors.startPrice}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field {{#if seller.productErrors.stepPrice}}has-error{{/if}}">
+                    <label for="product-step-price">Bước giá (VND)</label>
+                    <input id="product-step-price" type="text" inputmode="numeric" name="stepPrice" value="{{seller.productForm.stepPrice}}" class="currency-input" data-min="1000" required />
+                    <p class="field-hint">Nên lớn hơn 1.000₫ nhưng nhỏ hơn giá khởi điểm để tạo cạnh tranh hợp lý.</p>
+                    {{#if seller.productErrors.stepPrice}}<span class="field-error">{{seller.productErrors.stepPrice}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field {{#if seller.productErrors.buyNowPrice}}has-error{{/if}}">
+                    <label for="product-buy-now">Giá mua ngay (tuỳ chọn)</label>
+                    <input id="product-buy-now" type="text" inputmode="numeric" name="buyNowPrice" value="{{seller.productForm.buyNowPrice}}" class="currency-input" placeholder="Để trống nếu không dùng" />
+                    {{#if seller.productErrors.buyNowPrice}}<span class="field-error">{{seller.productErrors.buyNowPrice}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field {{#if seller.productErrors.startDate}}has-error{{/if}}">
+                    <label for="product-start-date">Bắt đầu</label>
+                    <input id="product-start-date" type="datetime-local" name="startDate" value="{{seller.productForm.startDate}}" required />
+                    <p class="field-hint">Chọn thời điểm ít nhất sau hiện tại 15 phút để người mua chuẩn bị.</p>
+                    {{#if seller.productErrors.startDate}}<span class="field-error">{{seller.productErrors.startDate}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field {{#if seller.productErrors.endDate}}has-error{{/if}}">
+                    <label for="product-end-date">Kết thúc</label>
+                    <input id="product-end-date" type="datetime-local" name="endDate" value="{{seller.productForm.endDate}}" required />
+                    <p class="field-hint">Phiên nên kéo dài ít nhất 1 giờ nhưng không quá 30 ngày.</p>
+                    {{#if seller.productErrors.endDate}}<span class="field-error">{{seller.productErrors.endDate}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field form-field--full {{#if seller.productErrors.shortDescription}}has-error{{/if}}">
+                    <label for="product-short-description">Mô tả ngắn</label>
+                    <textarea id="product-short-description" name="shortDescription" rows="2" placeholder="Tóm tắt điểm nổi bật" data-min-length="30" data-max-length="240">{{seller.productForm.shortDescription}}</textarea>
+                    <p class="field-hint">Khoảng 30–240 ký tự, tránh dùng ký hiệu khó hiểu.</p>
+                    {{#if seller.productErrors.shortDescription}}<span class="field-error">{{seller.productErrors.shortDescription}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field form-field--full {{#if seller.productErrors.fullDescription}}has-error{{/if}}">
+                    <label for="product-full-description">Mô tả chi tiết</label>
+                    <div class="quill-editor-wrapper">
+                      <div id="quill-editor" class="quill-editor-container"></div>
+                      <textarea id="product-full-description" name="fullDescription" rows="5" hidden>{{seller.productForm.fullDescription}}</textarea>
+                    </div>
+                    <p class="field-hint">Hãy cung cấp thông tin rõ ràng (Tối thiểu 80 ký tự). Sử dụng thanh công cụ để định dạng văn bản.</p>
+                    {{#if seller.productErrors.fullDescription}}<span class="field-error">{{seller.productErrors.fullDescription}}</span>{{/if}}
+                  </div>
+
+                  <div class="form-field form-field--full {{#if seller.productErrors.productImages}}has-error{{/if}}">
+                    <label for="product-images">Ảnh sản phẩm (ít nhất 3 ảnh)</label>
+                    <div class="image-upload-container">
+                      <div class="upload-tabs">
+                        <button type="button" class="upload-tab active" data-tab="file">Tải ảnh từ máy</button>
+                        <button type="button" class="upload-tab" data-tab="url">Nhập link ảnh</button>
+                      </div>
+                      
+                      <div class="upload-panel" id="upload-file-panel">
+                        <input id="product-images" type="file" name="productImages" accept="image/*" multiple />
+                        <p class="field-hint">Chọn ít nhất 3 ảnh từ thiết bị (JPEG, PNG, GIF, WEBP). Ảnh đầu tiên sẽ là ảnh đại diện.</p>
+                        <div id="image-preview-container" class="image-preview-grid"></div>
+                      </div>
+                      
+                      <div class="upload-panel" id="upload-url-panel" style="display: none;">
+                        <textarea id="product-image-urls" name="imageUrls" rows="4" placeholder="Nhập mỗi URL ảnh trên một dòng&#10;https://example.com/image1.jpg&#10;https://example.com/image2.jpg&#10;https://example.com/image3.jpg">{{seller.productForm.imageUrls}}</textarea>
+                        <p class="field-hint">Nhập URL ảnh, mỗi URL trên một dòng. Ảnh đầu tiên sẽ là ảnh đại diện.</p>
+                        <div id="url-preview-container" class="image-preview-grid"></div>
+                      </div>
+                    </div>
+                    {{#if seller.productErrors.productImages}}<span class="field-error">{{seller.productErrors.productImages}}</span>{{/if}}
+                    {{#if seller.productForm.existingImages}}
+                      <div class="existing-images">
+                        <p class="field-hint">Ảnh hiện tại (chọn file mới hoặc nhập URL nếu muốn thay đổi):</p>
+                        <div class="image-preview-grid">
+                          {{#each seller.productForm.existingImages}}
+                            <div class="image-preview-item">
+                              <img src="{{this}}" alt="Ảnh sản phẩm" />
+                            </div>
+                          {{/each}}
+                        </div>
+                      </div>
+                    {{/if}}
+                  </div>
+
+                  <div class="form-field form-field--inline">
+                    <label class="checkbox">
+                      <input type="checkbox" name="autoExtend" value="true" {{#if seller.productForm.autoExtend}}checked{{/if}} />
+                      <span>Tự động gia hạn phiên khi sắp kết thúc</span>
+                    </label>
+                    <p class="field-hint">Hệ thống sẽ tự động kéo dài phiên khi còn ít thời gian.</p>
+                  </div>
+                </div>
+                <div class="form-actions form-actions--between">
+                  {{#if seller.editingProductId}}
+                    <a href="/account/products" class="btn tertiary">Huỷ chỉnh sửa</a>
+                    <button type="submit" class="btn primary">Cập nhật sản phẩm</button>
+                  {{else}}
+                    <button type="reset" class="btn tertiary">Làm mới</button>
+                    <button type="submit" class="btn primary">Đăng sản phẩm</button>
+                  {{/if}}
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <aside class="account-panel-aside account-panel-aside--products">
+            <div class="account-card account-card--stats">
+              <h3>Tổng quan nhanh</h3>
+              <ul class="seller-stats">
+                <li><span>Đang bán</span><strong>{{seller.stats.active}}</strong></li>
+                <li><span>Bản nháp</span><strong>{{seller.stats.draft}}</strong></li>
+                <li><span>Đã bán</span><strong>{{seller.stats.sold}}</strong></li>
+              </ul>
+            </div>
+
+            <div class="account-card account-card--auto">
+              <h3>Gia hạn tự động</h3>
+              <ul class="settings-list">
+                <li>Kích hoạt khi còn {{seller.autoExtendSettings.triggerMinutes}} phút cuối.</li>
+                <li>Gia hạn thêm {{seller.autoExtendSettings.extendMinutes}} phút.</li>
+              </ul>
+              <p class="field-hint">Bạn có thể tắt tuỳ sản phẩm bằng cách bỏ chọn ở form tạo.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="seller-tab-panel" data-tab-panel="requests" role="tabpanel" hidden>
+        <section class="account-card account-card--requests">
+          <header class="section-header">
+            <h3>Yêu cầu tham gia đấu giá</h3>
+          </header>
+
+          {{#if seller.bidRequests.length}}
+            <table class="seller-requests">
+              <thead>
+                <tr>
+                  <th>Người yêu cầu</th>
+                  <th>Sản phẩm</th>
+                  <th>Lý do</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each seller.bidRequests}}
+                  <tr>
+                    <td>
+                      <a href="/users/{{bidderId}}/ratings" class="bidder-profile-link"><strong>{{bidderName}}</strong></a>
+                      <div class="meta">{{bidderEmail}}</div>
+                      <div class="meta">Đánh giá: {{bidderRatingPlus}} 👍 / {{bidderRatingMinus}} 👎</div>
+                      <div class="meta">Gửi lúc {{formatDate createdAt 'HH:mm DD/MM/YYYY'}}</div>
+                    </td>
+                    <td>
+                      <a href="/products/{{productId}}" target="_blank" rel="noopener">{{productTitle}}</a>
+                    </td>
+                    <td>
+                      {{#if message}}
+                        <p>{{message}}</p>
+                      {{else}}
+                        <p class="field-hint">Không có ghi chú</p>
+                      {{/if}}
+                    </td>
+                    <td>
+                      <form method="post" action="/account/products/{{productId}}/bid-requests/{{id}}" class="request-actions">
+                        <input type="text" name="note" placeholder="Ghi chú cho bidder (tuỳ chọn)" />
+                        <div class="form-actions">
+                          <button type="submit" name="action" value="approve" class="btn primary btn-sm">Chấp thuận</button>
+                          <button type="submit" name="action" value="reject" class="btn secondary btn-sm">Từ chối</button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          {{else}}
+            <p class="empty-state">Chưa có yêu cầu mới.</p>
+          {{/if}}
+        </section>
+      </section>
+
+      <section class="seller-tab-panel" data-tab-panel="sales" role="tabpanel" hidden>
+        <header class="section-header">
+          <h3>Quản lý bán hàng</h3>
+          <p>Theo dõi phiên đang bán và các sản phẩm đã chốt.</p>
+        </header>
+
+        <div class="account-products-board">
+          <section class="account-products-column">
+            <header>
+              <h3>Đang bán</h3>
+              <span>{{seller.stats.active}} sản phẩm</span>
+            </header>
+            {{#if seller.sellingProducts.length}}
+              <table class="seller-products">
+                <thead>
+                  <tr>
+                    <th>Tên sản phẩm</th>
+                    <th>Giá khởi điểm</th>
+                    <th>Giá hiện tại</th>
+                    <th>Kết thúc</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each seller.sellingProducts}}
+                    <tr>
+                      <td class="col-title"><a href="/products/{{id}}">{{title}}</a></td>
+                      <td>{{formatCurrency startPrice}}</td>
+                      <td>{{formatCurrency currentPrice}}</td>
+                      <td>{{#if endDate}}{{formatDate endDate 'HH:mm DD/MM/YYYY'}}{{else}}—{{/if}}</td>
+                      <td>
+                        {{#if order}}
+                          <span class="status-pill status-pill--order">
+                            {{#if (eq order.status 'awaiting_payment_details')}}
+                              Chờ thanh toán
+                            {{else}}
+                              {{localizeFulfillmentStatus order.status}}
+                            {{/if}}
+                          </span>
+                        {{else}}
+                          {{#if auctionEnded}}
+                            <span class="status-pill status-pill--ended">Kết thúc</span>
+                          {{else}}
+                            <span class="status-pill status-pill--active">{{statusLabel status}}</span>
+                          {{/if}}
+                        {{/if}}
+                      </td>
+                      <td>
+                        <div class="action-links">
+                          <i class="bi bi-pen">
+                            <a href="/account/products/{{id}}/edit">Sửa</a>
+                          </i>
+                          <i class="bi bi-trash">
+                            <a href="/account/products/{{id}}/delete" style="color: red;" onclick="return confirm('Bạn có chắc muốn xoá sản phẩm này?');">Xoá</a>
+                          </i>
+                        </div>
+                      </td>
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            {{else}}
+              <p class="empty-state">Chưa có sản phẩm nào đang được đấu giá.</p>
+            {{/if}}
+          </section>
+
+          <section class="account-products-column">
+            <header>
+              <h3>Đã bán</h3>
+              <span>{{seller.stats.sold}} sản phẩm</span>
+            </header>
+            {{#if seller.soldProducts.length}}
+              <table class="seller-products">
+                <thead>
+                  <tr>
+                    <th>Tên sản phẩm</th>
+                    <th>Giá khởi điểm</th>
+                    <th>Giá kết thúc</th>
+                    <th>Kết thúc</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#each seller.soldProducts}}
+                    <tr>
+                      <td class="col-title"><a href="/products/{{id}}">{{title}}</a></td>
+                      <td>{{formatCurrency startPrice}}</td>
+                      <td>{{#if currentPrice}}{{formatCurrency currentPrice}}{{else}}—{{/if}}</td>
+                      <td>{{#if endDate}}{{formatDate endDate 'HH:mm DD/MM/YYYY'}}{{else}}—{{/if}}</td>
+                      <td>
+                        {{#if (or (eq order.status 'transaction_completed') (eq status 'transaction_completed'))}}
+                          {{#if order.hasRated}}
+                            <span class="status-pill status-pill--order">Đã đánh giá</span>
+                          {{else}}
+                            <span class="status-pill status-pill--processing">Chờ đánh giá</span>
+                          {{/if}}
+                        {{else}}
+                          <span class="status-pill status-pill--processing">Đang xử lý</span>
+                        {{/if}}
+                      </td>
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            {{else}}
+              <p class="empty-state">Bạn chưa có sản phẩm nào đã bán xong.</p>
+            {{/if}}
+          </section>
+        </div>
+      </section>
+    </div>
   </div>
 </section>

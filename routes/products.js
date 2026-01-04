@@ -4,6 +4,7 @@ const router = express.Router();
 const dataService = require('../services/dataService');
 const hbsHelpers = require('../helpers/handlebars');
 const { buildWatchSet, applyWatchStateToList, applyWatchStateToProduct } = require('../helpers/watchlist');
+const mailer = require('../services/mailer');
 
 const PAGE_SIZE = 9;
 const CLOSED_STATUSES = new Set(['ended', 'draft', 'removed', 'cancelled', 'suspended']);
@@ -23,16 +24,28 @@ function computeAuctionState(product) {
 function buildBidState(product, user) {
   const roles = resolveRoles(user);
   const isBidderRole = roles.includes('bidder');
+  const isSellerRole = roles.includes('seller');
+  const canParticipate = isBidderRole || isSellerRole;
   const ratingPlus = Number(user?.ratingPlus || 0);
   const ratingMinus = Number(user?.ratingMinus || 0);
   const ratingTotal = ratingPlus + ratingMinus;
   const ratingPercent = ratingTotal > 0 ? Math.round((ratingPlus / ratingTotal) * 100) : null;
-  const allowUnratedBidders = Boolean(product.allowUnratedBidders ?? product.seller?.allowUnratedBidders ?? true);
-  const meetsRatingRequirement = ratingPercent !== null && ratingPercent >= 80;
-  const isUnratedBidder = ratingTotal === 0;
-  const qualifiesByException = isBidderRole && isUnratedBidder && allowUnratedBidders;
+  const hasRatings = ratingTotal > 0;
+  const meetsRatingRequirement = hasRatings && ratingPercent >= 80;
+  const requestStatus = product?.bidRequest?.status || null;
+  // Seller không cần approval, chỉ bidder mới cần
+  const needsSellerApproval = isBidderRole && !isSellerRole && !hasRatings;
+  const hasApproval = needsSellerApproval && requestStatus === 'approved';
+  const isPendingApproval = needsSellerApproval && requestStatus === 'pending';
+  const approvalDenied = needsSellerApproval && requestStatus === 'rejected';
+  const canRequestApproval = needsSellerApproval && (!requestStatus || requestStatus === 'rejected');
   const requiresLogin = !user;
-  const canBid = Boolean(user && isBidderRole && (meetsRatingRequirement || qualifiesByException));
+  // Seller luôn có thể đặt giá (không cần kiểm tra rating), bidder cần đủ điều kiện
+  const canBid = Boolean(
+    user &&
+      canParticipate &&
+      (isSellerRole || (hasRatings && meetsRatingRequirement) || (needsSellerApproval && hasApproval))
+  );
 
   const numericCurrentPrice = Number(product.currentPrice);
   const startPrice = Number(product.startPrice);
@@ -52,15 +65,63 @@ function buildBidState(product, user) {
     bidBase,
     canBid,
     requiresLogin,
-    showRatingNotice: Boolean(isBidderRole && !canBid && ratingPercent !== null),
-    showExceptionNote: Boolean(qualifiesByException),
+    showRatingNotice: Boolean(isBidderRole && !isSellerRole && !needsSellerApproval && !canBid && ratingPercent !== null),
     ratingPercent,
     ratingPlus,
     ratingMinus,
     ratingRuleMessage: 'Cần có điểm đánh giá >= 80% để tham gia đấu giá.',
     needsConfirmation: true,
     isBidderRole,
-    allowUnratedBidders,
+    isSellerRole,
+    canParticipate,
+    needsApproval: needsSellerApproval,
+    approvalStatus: requestStatus,
+    pendingApproval: isPendingApproval,
+    approvalDenied,
+    canRequestApproval,
+  };
+}
+
+function buildBuyNowState(product, user, options = {}) {
+  const { auctionClosed = false, isSellerOfProduct = false, loginUrl = null } = options;
+  const price = Number(product?.buyNowPrice);
+  if (!Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+  if (auctionClosed) {
+    return null;
+  }
+
+  const roles = resolveRoles(user);
+  const isBidderRole = roles.includes('bidder');
+  const isSellerRole = roles.includes('seller');
+  const canParticipate = isBidderRole || isSellerRole;
+  const requiresLogin = !user;
+  const canBuy = Boolean(!requiresLogin && canParticipate && !isSellerOfProduct);
+  let note = null;
+  let disabledLabel = 'Không thể Mua ngay';
+
+  if (!canBuy) {
+    if (requiresLogin) {
+      note = 'Đăng nhập để sử dụng tính năng Mua ngay.';
+      disabledLabel = 'Đăng nhập để Mua ngay';
+    } else if (isSellerOfProduct) {
+      note = 'Bạn không thể mua sản phẩm do chính mình đăng bán.';
+      disabledLabel = 'Bạn là người bán';
+    } else if (!canParticipate) {
+      note = 'Chỉ tài khoản bidder hoặc seller mới có thể sử dụng tính năng Mua ngay.';
+      disabledLabel = 'Không dành cho vai trò hiện tại';
+    }
+  }
+
+  return {
+    price,
+    priceFormatted: hbsHelpers.formatCurrency(price),
+    canBuy,
+    requiresLogin,
+    note,
+    disabledLabel,
+    loginUrl: requiresLogin ? loginUrl : null,
   };
 }
 
@@ -70,6 +131,34 @@ function resolveRoles(user) {
     return user.roles;
   }
   return user.role ? [user.role] : [];
+}
+
+function buildProductDetailUrl(req, productId) {
+  const basePath = `/products/${productId}#qa-thread`;
+  const host = req.get('host');
+  const protocol = req.protocol || 'https';
+  return host ? `${protocol}://${host}${basePath}` : basePath;
+}
+
+async function notifySellerAboutQuestion({ req, product, buyer, questionText }) {
+  try {
+    const sellerId = product?.seller?.id;
+    if (!sellerId) return;
+    const sellerUser = await dataService.getUserById(sellerId);
+    if (!sellerUser?.email) return;
+    const buyerName = buyer?.name || buyer?.email || 'Người mua';
+    const productUrl = buildProductDetailUrl(req, product.id);
+    await mailer.sendQuestionNotificationEmail({
+      to: sellerUser.email,
+      sellerName: sellerUser.name || product.seller?.name,
+      productTitle: product.title,
+      questionText,
+      productUrl,
+      askerName: buyerName,
+    });
+  } catch (error) {
+    console.error('[mailer] Không thể gửi email thông báo câu hỏi:', error);
+  }
 }
 
 const buildQaRedirect = (productId, params = {}) => {
@@ -83,19 +172,21 @@ async function renderList(req, res, next, categoryId) {
     const { page = 1, sort = 'endingSoon' } = req.query;
     const pageNumber = Math.max(1, parseInt(page, 10) || 1);
 
-    const results = await dataService.searchProducts(undefined, { sort, categoryId });
-    // console.log('Search results:', results);
-    const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
-    const start = (pageNumber - 1) * PAGE_SIZE;
-    const paged = results.slice(start, start + PAGE_SIZE);
+    const searchResult = await dataService.searchProducts(undefined, { 
+      sort, 
+      categoryId,
+      page: pageNumber,
+      limit: PAGE_SIZE
+    });
+    
     const watchSet = buildWatchSet(req.watchlistProductIds || req.currentUser?.watchlistIds);
-    applyWatchStateToList(paged, watchSet);
+    applyWatchStateToList(searchResult.products, watchSet);
     const category = categoryId ? await dataService.getCategoryById(categoryId) : null;
     res.render('products/list', {
-      products: paged,
-      total: results.length,
-      page: pageNumber,
-      totalPages,
+      products: searchResult.products,
+      total: searchResult.total,
+      page: searchResult.page,
+      totalPages: searchResult.totalPages,
       sort,
       category,
       categoryId,
@@ -122,6 +213,13 @@ router.get('/:id', async (req, res, next) => {
     applyWatchStateToList(relatedProducts, watchSet);
     const user = req.currentUser;
     const roles = resolveRoles(user);
+    const canParticipate = roles.includes('bidder') || roles.includes('seller');
+    if (user?.id && canParticipate) {
+      const bidRequest = await dataService.getBidRequest(product.id, user.id);
+      if (bidRequest) {
+        product.bidRequest = bidRequest;
+      }
+    }
     const isSellerOfProduct = Boolean(user?.id && String(product.seller?.id) === String(user.id));
     const { auctionClosed, auctionClosedReason } = computeAuctionState(product);
     const highestBidderId = product.highestBidder?.id ? String(product.highestBidder.id) : null;
@@ -181,14 +279,38 @@ router.get('/:id', async (req, res, next) => {
 
     const bidState = buildBidState(product, user);
     const bidContext = auctionClosed ? null : bidState;
+    const originalUrl = req.originalUrl || req.url || `/products/${product.id}`;
+    const loginUrl = `/auth/login?returnUrl=${encodeURIComponent(originalUrl)}`;
+    const buyNowContext = buildBuyNowState(product, user, {
+      auctionClosed,
+      isSellerOfProduct,
+      loginUrl,
+    });
+
+    // Lấy danh sách bidder đã bị từ chối (chỉ khi seller xem)
+    let rejectedBidderIds = [];
+    if (isSellerOfProduct) {
+      const rejectedBidders = await dataService.getRejectedBiddersForProduct(product.id);
+      rejectedBidderIds = rejectedBidders.map((r) => String(r.bidderId));
+    }
+
+    // Đánh dấu các bid của bidder bị từ chối
+    if (product.bids && rejectedBidderIds.length > 0) {
+      product.bids = product.bids.map((bid) => ({
+        ...bid,
+        isRejected: rejectedBidderIds.includes(String(bid.bidderId)),
+      }));
+    }
 
     res.render('products/detail', {
       product,
       relatedProducts,
-      canAskQuestion: Boolean(user && !isSellerOfProduct && roles.includes('bidder')),
+      isSellerOfProduct,
+      canAskQuestion: Boolean(user && !isSellerOfProduct && canParticipate),
       canAnswerQuestion: isSellerOfProduct,
       isAuthenticated: Boolean(user),
       bidContext,
+      buyNowContext,
       auctionClosed,
       auctionClosedReason,
       qaStatus: {
@@ -209,7 +331,8 @@ router.post('/:id/bids', async (req, res, next) => {
     }
 
     const roles = resolveRoles(user);
-    if (!roles.includes('bidder')) {
+    const canParticipate = roles.includes('bidder') || roles.includes('seller');
+    if (!canParticipate) {
       return res.status(403).json({ error: 'Tài khoản của bạn chưa đủ quyền để đặt giá.' });
     }
 
@@ -227,6 +350,19 @@ router.post('/:id/bids', async (req, res, next) => {
       return res.status(400).json({ error: 'Bạn không thể đặt giá lên sản phẩm của chính mình.' });
     }
 
+    // Kiểm tra xem bidder có bị từ chối không
+    const isRejected = await dataService.isBidderRejected(rawProductId, user.id);
+    if (isRejected) {
+      return res.status(403).json({ error: 'Bạn đã bị từ chối tham gia đấu giá sản phẩm này.' });
+    }
+
+    if (roles.includes('bidder')) {
+      const bidRequest = await dataService.getBidRequest(product.id, user.id);
+      if (bidRequest) {
+        product.bidRequest = bidRequest;
+      }
+    }
+
     const { auctionClosed } = computeAuctionState(product);
     if (auctionClosed) {
       return res.status(400).json({ error: 'Phiên đấu giá đã kết thúc. Bạn không thể tiếp tục đặt giá.' });
@@ -236,7 +372,9 @@ router.post('/:id/bids', async (req, res, next) => {
     if (!bidState.canBid) {
       const message = bidState.requiresLogin
         ? 'Vui lòng đăng nhập để đặt giá.'
-        : 'Tài khoản của bạn chưa đủ điều kiện để đặt giá cho sản phẩm này.';
+        : bidState.needsApproval && bidState.approvalStatus !== 'approved'
+          ? 'Bạn cần người bán chấp thuận yêu cầu tham gia đấu giá trước khi đặt giá.'
+          : 'Tài khoản của bạn chưa đủ điều kiện để đặt giá cho sản phẩm này.';
       return res.status(403).json({ error: message });
     }
 
@@ -260,16 +398,35 @@ router.post('/:id/bids', async (req, res, next) => {
     const bidBase = Number.isFinite(bidState.bidBase) ? bidState.bidBase : (minBid && step ? minBid - step : 0);
     if (step > 0 && Number.isFinite(bidBase)) {
       const delta = amount - bidBase;
-      if (delta % step !== 0) {
+      // Use tolerance for floating point comparison - ensure delta is a valid multiple of step
+      const remainder = delta % step;
+      const tolerance = 0.01; // Allow small floating point errors
+      const isValidStep = remainder < tolerance || (step - remainder) < tolerance;
+      if (delta < 0 || !isValidStep) {
         return res.status(400).json({ error: 'Giá đặt phải tăng theo đúng bước giá đã quy định.' });
       }
     }
+
+    // Lưu thông tin người giữ giá trước đó để gửi email thông báo bị vượt giá
+    const previousHighestBidder = product.highestBidder?.id ? { ...product.highestBidder } : null;
+    const previousBidAmount = product.currentPrice;
 
     await dataService.placeBid({
       productId: rawProductId,
       bidderId: user.id,
       amount,
     });
+
+    // Process auto-bids from other users
+    try {
+      const autoBidResult = await dataService.processAutoBids({
+        productId: rawProductId,
+        currentBidAmount: amount,
+        currentBidderId: user.id,
+      });
+    } catch (autoBidError) {
+      console.error('[auto-bid] Error processing auto-bids:', autoBidError);
+    }
 
     const updatedProduct = await dataService.getProductById(rawProductId, { includeBannedSeller: true });
     const updatedBidState = buildBidState(updatedProduct, user);
@@ -278,6 +435,56 @@ router.post('/:id/bids', async (req, res, next) => {
     const leaderTotal = leaderPlus + leaderMinus;
     const leaderPercent = leaderTotal > 0 ? Math.round((leaderPlus / leaderTotal) * 100) : 0;
     const leaderDisplay = `${hbsHelpers.maskName(updatedProduct.highestBidder?.name || 'Ẩn danh')} (${leaderPercent}%)`;
+
+    // Gửi email thông báo cho các bên liên quan
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol || 'http';
+    const productUrl = `${protocol}://${host}/products/${rawProductId}`;
+    const formattedAmount = hbsHelpers.formatCurrency(amount);
+
+    // 1. Gửi email cho người đặt giá (bidder) - xác nhận đặt giá thành công
+    if (user.email) {
+      mailer.sendBidSuccessEmail({
+        to: user.email,
+        bidderName: user.name,
+        productTitle: product.title,
+        productUrl,
+        bidAmount: formattedAmount,
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email xác nhận đặt giá cho bidder:', err);
+      });
+    }
+
+    // 2. Gửi email cho người bán (seller) - thông báo có người đặt giá mới
+    if (product.seller?.email) {
+      mailer.sendBidNotificationToSeller({
+        to: product.seller.email,
+        sellerName: product.seller.name,
+        productTitle: product.title,
+        productUrl,
+        bidderName: hbsHelpers.maskName(user.name),
+        bidAmount: formattedAmount,
+        bidCount: updatedProduct.bidCount,
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email thông báo đặt giá cho seller:', err);
+      });
+    }
+
+    // 3. Gửi email cho người giữ giá trước đó (nếu có và khác người đặt giá mới)
+    if (previousHighestBidder?.id && 
+        String(previousHighestBidder.id) !== String(user.id) && 
+        previousHighestBidder.email) {
+      mailer.sendOutbidNotificationEmail({
+        to: previousHighestBidder.email,
+        previousBidderName: previousHighestBidder.name,
+        productTitle: product.title,
+        productUrl,
+        newBidAmount: formattedAmount,
+        yourBidAmount: hbsHelpers.formatCurrency(previousBidAmount),
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email thông báo bị vượt giá:', err);
+      });
+    }
     const latestBid = updatedProduct.bids?.[0] || null;
 
     return res.json({
@@ -304,6 +511,319 @@ router.post('/:id/bids', async (req, res, next) => {
             amountText: hbsHelpers.formatCurrency(latestBid.amount),
           }
         : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== Auto-Bid Routes ==========
+
+// Get current auto-bid setting
+router.get('/:id/auto-bid', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    const autoBid = await dataService.getAutoBid(productId, user.id);
+    return res.json({
+      hasAutoBid: Boolean(autoBid),
+      autoBid: autoBid ? {
+        maxPrice: autoBid.maxPrice,
+        maxPriceFormatted: hbsHelpers.formatCurrency(autoBid.maxPrice),
+        createdAt: autoBid.createdAt,
+      } : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Set or update auto-bid
+router.post('/:id/auto-bid', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập để đặt giá tự động.' });
+    }
+
+    const roles = resolveRoles(user);
+    const canParticipate = roles.includes('bidder') || roles.includes('seller');
+    if (!canParticipate) {
+      return res.status(403).json({ error: 'Chỉ tài khoản bidder hoặc seller mới được phép đặt giá tự động.' });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    // Check if bidder is rejected
+    const isRejected = await dataService.isBidderRejected(productId, user.id);
+    if (isRejected) {
+      return res.status(403).json({ error: 'Bạn đã bị từ chối tham gia đấu giá sản phẩm này.' });
+    }
+
+    // Get product for validation
+    const product = await dataService.getProductById(productId, { includeBannedSeller: true });
+    if (!product) {
+      return res.status(404).json({ error: 'Không tìm thấy sản phẩm.' });
+    }
+
+    // Check if product requires bid request
+    if (product.requireBidApproval) {
+      const bidRequest = await dataService.getBidRequest(productId, user.id);
+      if (!bidRequest || bidRequest.status !== 'approved') {
+        return res.status(403).json({ 
+          error: 'Sản phẩm này yêu cầu duyệt trước khi đấu giá. Vui lòng gửi yêu cầu tham gia.',
+          requiresApproval: true,
+        });
+      }
+    }
+
+    const normalizeAmount = (value) => {
+      if (typeof value === 'number') return value;
+      if (!value) return NaN;
+      return Number(String(value).replace(/[^0-9]/g, ''));
+    };
+
+    const maxPrice = normalizeAmount(req.body?.maxPrice);
+    if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+      return res.status(400).json({ error: 'Giá tối đa không hợp lệ.' });
+    }
+
+    // Calculate minimum required
+    const currentPrice = Number(product.currentPrice || product.startPrice || 0);
+    const bidStep = Number(product.bidStep || 0);
+    const minRequired = product.bidCount > 0 ? currentPrice + bidStep : currentPrice;
+
+    if (maxPrice < minRequired) {
+      return res.status(400).json({ 
+        error: `Giá tối đa phải ít nhất ${hbsHelpers.formatCurrency(minRequired)}.`,
+        minRequired,
+      });
+    }
+
+    // Set auto-bid
+    const result = await dataService.setAutoBid({
+      productId,
+      bidderId: user.id,
+      maxPrice,
+    });
+
+    // If user doesn't have the current highest bid, place an initial bid
+    const isCurrentLeader = product.highestBidder?.id && String(product.highestBidder.id) === String(user.id);
+    let initialBidPlaced = false;
+    let newBidAmount = null;
+
+    if (!isCurrentLeader) {
+      // Place initial bid at minimum price
+      const initialBid = product.bidCount > 0 ? currentPrice + bidStep : currentPrice;
+      
+      if (initialBid <= maxPrice) {
+        try {
+          await dataService.placeBid({
+            productId,
+            bidderId: user.id,
+            amount: initialBid,
+          });
+          initialBidPlaced = true;
+          newBidAmount = initialBid;
+
+          // Process other auto-bids in response
+          const autoBidResult = await dataService.processAutoBids({
+            productId,
+            currentBidAmount: initialBid,
+            currentBidderId: user.id,
+          });
+
+          if (autoBidResult.processed && autoBidResult.autoBid) {
+            newBidAmount = autoBidResult.autoBid.amount;
+          }
+        } catch (bidError) {
+          console.error('[auto-bid] Error placing initial bid:', bidError);
+        }
+      }
+    }
+
+    // Get updated product state
+    const updatedProduct = await dataService.getProductById(productId, { includeBannedSeller: true });
+    const updatedBidState = buildBidState(updatedProduct, user);
+
+    return res.json({
+      success: true,
+      message: initialBidPlaced 
+        ? 'Đã thiết lập đấu giá tự động và đặt giá khởi đầu!' 
+        : 'Đã thiết lập đấu giá tự động!',
+      autoBid: {
+        maxPrice: result.maxPrice,
+        maxPriceFormatted: hbsHelpers.formatCurrency(result.maxPrice),
+      },
+      initialBidPlaced,
+      product: {
+        currentPrice: updatedProduct.currentPrice,
+        currentPriceFormatted: hbsHelpers.formatCurrency(updatedProduct.currentPrice),
+        bidCount: updatedProduct.bidCount,
+        nextMinimumBid: updatedBidState.nextMinimumBid,
+      },
+    });
+  } catch (error) {
+    if (error.code === 'AUCTION_NOT_ACTIVE' || error.code === 'AUCTION_ENDED') {
+      return res.status(400).json({ error: 'Phiên đấu giá đã kết thúc.' });
+    }
+    if (error.code === 'CANNOT_BID_OWN_PRODUCT') {
+      return res.status(403).json({ error: 'Bạn không thể đấu giá sản phẩm của chính mình.' });
+    }
+    next(error);
+  }
+});
+
+// Remove auto-bid
+router.delete('/:id/auto-bid', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    const removed = await dataService.removeAutoBid(productId, user.id);
+    return res.json({
+      success: true,
+      removed,
+      message: removed ? 'Đã hủy đấu giá tự động.' : 'Không có thiết lập đấu giá tự động nào.',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/buy-now', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập để sử dụng tính năng Mua ngay.' });
+    }
+
+    const roles = resolveRoles(user);
+    const canParticipate = roles.includes('bidder') || roles.includes('seller');
+    if (!canParticipate) {
+      return res.status(403).json({ error: 'Chỉ tài khoản bidder hoặc seller mới được phép Mua ngay.' });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    const result = await dataService.buyProductNow({ productId, buyerId: user.id });
+    const successNote = encodeURIComponent('Đã mua ngay thành công. Hãy hoàn tất thông tin thanh toán nhé!');
+    const redirectUrl = `/products/${productId}?focus=step-payment&fulfillSuccess=${successNote}`;
+
+    return res.json({
+      success: true,
+      orderId: result.orderId,
+      redirectUrl,
+    });
+  } catch (error) {
+    const friendlyMessages = {
+      BUY_NOW_INVALID_INPUT: 'Thiếu thông tin để Mua ngay.',
+      BUY_NOW_PRODUCT_NOT_FOUND: 'Sản phẩm không tồn tại hoặc đã bị gỡ.',
+      BUY_NOW_SELF_PURCHASE: 'Bạn không thể mua sản phẩm của chính mình.',
+      BUY_NOW_NOT_AVAILABLE: 'Sản phẩm đã kết thúc hoặc không còn hỗ trợ Mua ngay.',
+      BUY_NOW_NOT_CONFIGURED: 'Người bán chưa bật giá Mua ngay cho sản phẩm này.',
+      BUY_NOW_ALREADY_COMPLETED: 'Sản phẩm đã có người chốt mua trước đó.',
+    };
+
+    if (error.code && friendlyMessages[error.code]) {
+      const statusMap = {
+        BUY_NOW_PRODUCT_NOT_FOUND: 404,
+        BUY_NOW_ALREADY_COMPLETED: 409,
+      };
+      const status = statusMap[error.code] || 400;
+      return res.status(status).json({ error: friendlyMessages[error.code] });
+    }
+
+    next(error);
+  }
+});
+
+router.post('/:id/bid-requests', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập để gửi yêu cầu tham gia đấu giá.' });
+    }
+
+    const roles = resolveRoles(user);
+    if (!roles.includes('bidder')) {
+      return res.status(403).json({ error: 'Chỉ tài khoản bidder mới có thể gửi yêu cầu.' });
+    }
+
+    const ratingPlus = Number(user.ratingPlus || 0);
+    const ratingMinus = Number(user.ratingMinus || 0);
+    if (ratingPlus + ratingMinus > 0) {
+      return res.status(400).json({ error: 'Tính năng này chỉ dành cho tài khoản chưa có đánh giá.' });
+    }
+
+    const rawProductId = Number(req.params.id);
+    if (!Number.isFinite(rawProductId) || rawProductId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    const product = await dataService.getProductById(rawProductId, { includeBannedSeller: true });
+    if (!product) {
+      return res.status(404).json({ error: 'Sản phẩm không tồn tại.' });
+    }
+
+    if (String(product.seller?.id || '') === String(user.id)) {
+      return res.status(400).json({ error: 'Bạn không cần gửi yêu cầu cho sản phẩm của chính mình.' });
+    }
+
+    const message = req.body?.message || '';
+    const result = await dataService.createBidRequest({
+      productId: rawProductId,
+      bidderId: user.id,
+      message,
+    });
+
+    // Gửi email thông báo cho seller nếu yêu cầu mới được tạo hoặc gửi lại
+    if (result.created || result.updated) {
+      const sellerEmail = product.seller?.email;
+      if (sellerEmail) {
+        const host = req.get('host') || 'localhost:3000';
+        const protocol = req.protocol || 'http';
+        const productUrl = `${protocol}://${host}/account/products`;
+        
+        mailer.sendBidRequestNotificationEmail({
+          to: sellerEmail,
+          sellerName: product.seller?.name,
+          bidderName: user.name,
+          bidderEmail: user.email,
+          productTitle: product.title,
+          productUrl,
+          message,
+        }).catch((err) => {
+          console.error('[mailer] Không thể gửi email thông báo yêu cầu đấu giá:', err);
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      status: result.status,
+      request: result.request,
     });
   } catch (error) {
     next(error);
@@ -384,7 +904,8 @@ router.post('/:id/questions', async (req, res, next) => {
       return res.redirect(buildQaRedirect(productId, { qaError: 'owner' }));
     }
 
-    if (!roles.includes('bidder')) {
+    const canParticipate = roles.includes('bidder') || roles.includes('seller');
+    if (!canParticipate) {
       return res.redirect(buildQaRedirect(productId, { qaError: 'permission' }));
     }
 
@@ -398,6 +919,8 @@ router.post('/:id/questions', async (req, res, next) => {
       buyerId: user.id,
       questionText,
     });
+
+    notifySellerAboutQuestion({ req, product, buyer: user, questionText });
 
     return res.redirect(buildQaRedirect(productId, { qaSuccess: 'question' }));
   } catch (error) {
@@ -442,6 +965,173 @@ router.post('/:productId/questions/:questionId/answers', async (req, res, next) 
 
     return res.redirect(buildQaRedirect(productId, { qaSuccess: 'answer' }));
   } catch (error) {
+    next(error);
+  }
+});
+
+// Seller từ chối bidder - không cho đấu giá sản phẩm này nữa
+router.post('/:id/reject-bidder', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
+    }
+
+    const roles = resolveRoles(user);
+    if (!roles.includes('seller')) {
+      return res.status(403).json({ error: 'Chỉ người bán mới có quyền thực hiện thao tác này.' });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    const bidderId = Number(req.body?.bidderId);
+    if (!Number.isFinite(bidderId) || bidderId <= 0) {
+      return res.status(400).json({ error: 'Mã người mua không hợp lệ.' });
+    }
+
+    const reason = req.body?.reason || '';
+
+    const result = await dataService.rejectBidder({
+      productId,
+      bidderId,
+      sellerId: user.id,
+      reason,
+    });
+
+    if (result.alreadyRejected) {
+      return res.json({
+        success: true,
+        message: 'Người mua này đã bị từ chối trước đó.',
+        alreadyRejected: true,
+      });
+    }
+
+    // Gửi email thông báo cho bidder bị từ chối
+    if (result.rejectedBidder?.email) {
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      const productUrl = `${protocol}://${host}/products/${productId}`;
+
+      mailer.sendBidRequestResponseEmail({
+        to: result.rejectedBidder.email,
+        bidderName: result.rejectedBidder.name,
+        productTitle: result.productTitle,
+        productUrl,
+        approved: false,
+        sellerNote: reason || 'Người bán đã từ chối quyền đấu giá của bạn cho sản phẩm này.',
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email thông báo từ chối bidder:', err);
+      });
+    }
+
+    // Nếu bidder bị từ chối đang là người cao nhất, thông báo cho người kế tiếp
+    if (result.wasHighestBidder && result.newHighestBidder?.email) {
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      const productUrl = `${protocol}://${host}/products/${productId}`;
+
+      mailer.sendBidSuccessEmail({
+        to: result.newHighestBidder.email,
+        bidderName: result.newHighestBidder.name,
+        productTitle: result.productTitle,
+        productUrl,
+        bidAmount: hbsHelpers.formatCurrency(result.newHighestBidder.bidAmount),
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email thông báo người dẫn đầu mới:', err);
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: result.wasHighestBidder
+        ? 'Đã từ chối người mua. Giá sản phẩm đã được cập nhật cho người đặt giá cao thứ nhì.'
+        : 'Đã từ chối người mua. Họ không thể đấu giá sản phẩm này nữa.',
+      wasHighestBidder: result.wasHighestBidder,
+      newHighestBidder: result.newHighestBidder ? {
+        name: hbsHelpers.maskName(result.newHighestBidder.name),
+        bidAmount: hbsHelpers.formatCurrency(result.newHighestBidder.bidAmount),
+      } : null,
+    });
+  } catch (error) {
+    if (error.code === 'PRODUCT_NOT_FOUND') {
+      return res.status(404).json({ error: 'Sản phẩm không tồn tại.' });
+    }
+    if (error.code === 'NOT_PRODUCT_OWNER') {
+      return res.status(403).json({ error: 'Bạn không phải là chủ sản phẩm này.' });
+    }
+    next(error);
+  }
+});
+
+// Hoàn tác từ chối bidder
+router.post('/:id/unreject-bidder', async (req, res, next) => {
+  try {
+    const user = req.currentUser;
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
+    }
+
+    const roles = resolveRoles(user);
+    if (!roles.includes('seller')) {
+      return res.status(403).json({ error: 'Chỉ người bán mới có quyền thực hiện thao tác này.' });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Mã sản phẩm không hợp lệ.' });
+    }
+
+    const bidderId = Number(req.body?.bidderId);
+    if (!Number.isFinite(bidderId) || bidderId <= 0) {
+      return res.status(400).json({ error: 'Mã người mua không hợp lệ.' });
+    }
+
+    const result = await dataService.unrejectBidder({
+      productId,
+      bidderId,
+      sellerId: user.id,
+    });
+
+    if (result.notFound) {
+      return res.json({
+        success: true,
+        message: 'Người mua này chưa bị từ chối.',
+        notFound: true,
+      });
+    }
+
+    // Gửi email thông báo cho bidder được hoàn tác
+    if (result.bidder?.email) {
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      const productUrl = `${protocol}://${host}/products/${productId}`;
+
+      mailer.sendBidRequestResponseEmail({
+        to: result.bidder.email,
+        bidderName: result.bidder.name,
+        productTitle: result.productTitle,
+        productUrl,
+        approved: true,
+        sellerNote: 'Người bán đã cho phép bạn tiếp tục tham gia đấu giá sản phẩm này.',
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email thông báo hoàn tác từ chối:', err);
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Đã hoàn tác từ chối. Người mua có thể tiếp tục đấu giá sản phẩm này.',
+    });
+  } catch (error) {
+    if (error.code === 'PRODUCT_NOT_FOUND') {
+      return res.status(404).json({ error: 'Sản phẩm không tồn tại.' });
+    }
+    if (error.code === 'NOT_PRODUCT_OWNER') {
+      return res.status(403).json({ error: 'Bạn không phải là chủ sản phẩm này.' });
+    }
     next(error);
   }
 });

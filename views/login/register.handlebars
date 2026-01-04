@@ -9,10 +9,10 @@
       <div class="alert alert-{{flash.type}}">{{flash.message}}</div>
     {{/if}}
 
-    <form class="auth-form" method="post" novalidate>
+    <form class="auth-form" method="post">
       <div class="form-field {{#if errors.name}}has-error{{/if}}">
         <label for="name">Họ và tên</label>
-        <input id="name" name="name" type="text" placeholder="VD: Nguyễn Văn A" value="{{form.name}}" required />
+        <input id="name" name="name" type="text" placeholder="VD: Nguyễn Văn A" value="{{form.name}}" required data-min-length="2" data-max-length="100" />
         {{#if errors.name}}
           <span class="field-error">{{errors.name}}</span>
         {{/if}}
@@ -28,7 +28,7 @@
 
       <div class="form-field {{#if errors.address}}has-error{{/if}}">
         <label for="address">Địa chỉ</label>
-        <textarea id="address" name="address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành" rows="3" required>{{form.address}}</textarea>
+        <textarea id="address" name="address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành" rows="3" required data-min-length="10">{{form.address}}</textarea>
         {{#if errors.address}}
           <span class="field-error">{{errors.address}}</span>
         {{/if}}
@@ -54,8 +54,7 @@
         {{#if config.recaptchaSiteKey}}
           <div class="g-recaptcha" data-sitekey="{{config.recaptchaSiteKey}}"></div>
         {{else}}
-          <p class="field-hint">Thiếu reCAPTCHA site key. Trong môi trường demo, nhập mã "test-pass" vào trường reCAPTCHA ảo bên dưới.</p>
-          <input type="text" name="g-recaptcha-response" placeholder="test-pass" />
+          <p class="field-error">Thiếu reCAPTCHA site key. Vui lòng liên hệ quản trị viên để cấu hình.</p>
         {{/if}}
         {{#if errors.recaptcha}}
           <span class="field-error">{{errors.recaptcha}}</span>

@@ -1,30 +1,62 @@
-<section class="fulfillment-view" {{#if fulfillment.focusTarget}}data-focus-target="{{fulfillment.focusTarget}}"{{/if}}>
-  <header class="fulfillment-header">
-    <div>
+<section class="fulfillment-view order-flow" data-order-flow data-order-status="{{fulfillment.order.status}}" {{#if fulfillment.focusTarget}}data-focus-target="{{fulfillment.focusTarget}}"{{/if}}>
+  <div class="order-hero-card">
+    <div class="order-hero-card__main">
       <p class="eyebrow">Hoàn tất đơn hàng</p>
-      <h1>{{product.title}}</h1>
-      <p>
-        Người bán: <strong>{{ product.seller.name}}</strong> · Giá thắng: <strong>{{formatCurrency product.currentPrice}}</strong>
-      </p>
-      <p class="status-pill status-pill--ended">Phiên đấu giá đã kết thúc</p>
+      <h1>Hoàn tất đơn hàng</h1>
+      <p class="order-hero-card__code">Đơn hàng #ORD-{{fulfillment.order.id}}</p>
+      <p class="order-hero-card__product">{{product.title}}</p>
     </div>
-    <div class="fulfillment-summary">
-      <dl>
-        <div>
-          <dt>Mã sản phẩm</dt>
-          <dd>#{{product.id}}</dd>
-        </div>
-        <div>
-          <dt>Thời gian kết thúc</dt>
-          <dd>{{formatDate product.endDate 'DD/MM/YYYY HH:mm'}}</dd>
-        </div>
-        <div>
-          <dt>Trạng thái đơn hàng</dt>
-          <dd class="order-status order-status--{{fulfillment.order.status}}">{{localizeFulfillmentStatus fulfillment.order.status}}</dd>
-        </div>
-      </dl>
+    <div class="order-hero-card__stats">
+      <div class="order-stat">
+        <span>Giá thắng</span>
+        <strong>
+          {{#if fulfillment.order.totalPrice}}
+            {{formatCurrency fulfillment.order.totalPrice}}
+          {{else}}
+            {{formatCurrency product.currentPrice}}
+          {{/if}}
+        </strong>
+      </div>
+      <div class="order-stat">
+        <span>Người bán</span>
+        <strong>{{#if product.seller.name}}{{product.seller.name}}{{else}}Ẩn danh{{/if}}</strong>
+      </div>
+      <div class="order-stat">
+        <span>Thời gian kết thúc</span>
+        <strong>{{formatDate product.endDate 'DD/MM/YYYY HH:mm'}}</strong>
+      </div>
+      <div class="order-stat order-stat--status">
+        <span>Trạng thái</span>
+        <span class="status-chip {{#if (eq fulfillment.order.status 'transaction_completed')}}{{#if (and fulfillment.order.ratings.buyerToSeller.score fulfillment.order.ratings.sellerToBuyer.score)}}status-chip--success{{else}}status-chip--info{{/if}}{{else if (eq fulfillment.order.status 'delivery_confirmed_ready_to_rate')}}status-chip--info{{else if (eq fulfillment.order.status 'canceled_by_seller')}}status-chip--warning{{else}}status-chip--neutral{{/if}}">
+          <i class="bi bi-check-circle-fill" aria-hidden="true"></i>{{#if (eq fulfillment.order.status 'transaction_completed')}}{{#if (and fulfillment.order.ratings.buyerToSeller.score fulfillment.order.ratings.sellerToBuyer.score)}}Đã đánh giá{{else}}Chờ đánh giá{{/if}}{{else}}{{localizeFulfillmentStatus fulfillment.order.status}}{{/if}}
+        </span>
+      </div>
     </div>
-  </header>
+  </div>
+
+  <ol class="order-progress" aria-label="Tiến trình hoàn tất đơn hàng" data-order-tabs role="tablist">
+    {{#each fulfillment.steps}}
+      <li
+        class="order-progress__step {{#if isCompleted}}is-completed{{/if}} {{#if isCurrent}}is-current{{/if}} {{#if (isOrderStageActive ../fulfillment.order.status id)}}is-active{{/if}} {{#if ../fulfillment.isCanceled}}is-disabled{{/if}}"
+        data-order-tab="{{id}}"
+        role="tab"
+        id="order-tab-{{id}}"
+        aria-controls="{{#if (eq id 'payment')}}step-payment{{else if (eq id 'seller-confirm')}}step-confirm{{else if (eq id 'delivery')}}step-delivery{{else}}rating{{/if}}"
+        aria-selected="{{#if (isOrderStageActive ../fulfillment.order.status id)}}true{{else}}false{{/if}}"
+        tabindex="{{#if (isOrderStageActive ../fulfillment.order.status id)}}0{{else}}-1{{/if}}"
+      >
+        <span class="order-progress__icon" aria-hidden="true">
+          <i class="bi {{#if (eq id 'payment')}}bi-file-earmark-text{{else if (eq id 'seller-confirm')}}bi-check-circle{{else if (eq id 'delivery')}}bi-box-seam{{else}}bi-star{{/if}}"></i>
+        </span>
+        <div>
+          <p class="order-progress__title">
+            {{#if (eq id 'payment')}}Thanh toán{{else if (eq id 'seller-confirm')}}Xác nhận{{else if (eq id 'delivery')}}Nhận hàng{{else}}Đánh giá{{/if}}
+          </p>
+          <p class="order-progress__desc">{{description}}</p>
+        </div>
+      </li>
+    {{/each}}
+  </ol>
 
   {{#if fulfillment.flash.success}}
     <div class="fulfillment-alert fulfillment-alert--success">{{fulfillment.flash.success}}</div>
@@ -39,107 +71,267 @@
     </div>
   {{/if}}
 
-  <ol class="fulfillment-steps">
-    {{#each fulfillment.steps}}
-      <li class="fulfillment-step {{#if isCurrent}}is-current{{/if}} {{#if isCompleted}}is-completed{{/if}} {{#if ../fulfillment.isCanceled}}is-disabled{{/if}}">
-        <span class="step-number">{{stepNumber}}</span>
-        <div>
-          <h3>{{title}}</h3>
-          <p>{{description}}</p>
-          <p class="step-meta">{{statusLabel}}</p>
+  <div class="order-panels" data-order-panels>
+  <section
+    class="order-stage{{#if (isOrderStageActive fulfillment.order.status 'payment')}} is-active{{/if}}"
+    data-order-panel="payment"
+    id="step-payment"
+    role="tabpanel"
+    aria-labelledby="order-tab-payment"
+    aria-hidden="{{#if (isOrderStageActive fulfillment.order.status 'payment')}}false{{else}}true{{/if}}"
+    {{#unless (isOrderStageActive fulfillment.order.status 'payment')}}hidden{{/unless}}
+  >
+    <header class="order-stage__header">
+      <div>
+        <p class="order-stage__eyebrow">Bước 1: Thanh toán</p>
+        <h2>Thanh toán & giao hàng</h2>
+        <p>Cung cấp hoá đơn và địa chỉ nhận hàng.</p>
+      </div>
+      <div class="order-stage__status">
+        <span class="stage-status">{{localizeFulfillmentStatus 'awaiting_payment_details'}}</span>
+      </div>
+    </header>
+    <div class="order-stage__body">
+      {{#if fulfillment.canSubmitPayment}}
+        <form
+          method="post"
+          action="/orders/{{fulfillment.order.id}}/payment-details"
+          class="order-form order-form--columns"
+          enctype="multipart/form-data"
+        >
+          <div class="order-form__main">
+            <label class="field-group">
+              <span>Phương thức thanh toán *</span>
+              <select name="paymentMethod" required>
+                <option value="" disabled selected>Chọn phương thức</option>
+                <option value="Tiền mặt">Tiền mặt</option>
+                <option value="Thẻ ngân hàng (ghi nợ)">Thẻ ngân hàng (ghi nợ)</option>
+                <option value="Thẻ ngân hàng (tín dụng)">Thẻ ngân hàng (tín dụng)</option>
+                <option value="Ví điện tử (QR Pay)">Ví điện tử (QR Pay)</option>
+                <option value="Chuyển khoản ngân hàng">Chuyển khoản ngân hàng</option>
+              </select>
+            </label>
+            <label class="field-group">
+              <span>Địa chỉ giao hàng *</span>
+              <textarea name="shippingAddress" rows="3" placeholder="Nhập địa chỉ giao hàng đầy đủ" required></textarea>
+            </label>
+            <label class="field-group field-group--upload">
+              <span>Hoá đơn thanh toán *</span>
+              <div class="invoice-upload" data-invoice-upload data-max-files="5">
+                <div class="invoice-upload__row">
+                  <div class="invoice-preview-list" data-upload-preview-list>
+                    <div class="invoice-preview-empty" data-preview-empty>
+                      <i class="bi bi-image" aria-hidden="true"></i>
+                      <p>Chưa có ảnh nào. Tải hoá đơn để người bán xác nhận nhanh hơn.</p>
+                    </div>
+                  </div>
+                  <div class="invoice-upload__plus" data-upload-plus hidden>
+                    <span>+</span>
+                  </div>
+                  <div class="upload-tile" data-upload-dropzone>
+                    <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                    <p>Thêm ảnh hoá đơn</p>
+                    <small>Hỗ trợ PNG, JPG/JPEG &lt; 10MB</small>
+                    <input
+                      type="file"
+                      name="invoiceImages"
+                      accept="image/*"
+                      multiple
+                      required
+                      data-upload-input
+                    />
+                  </div>
+                </div>
+                <div class="upload-meta">
+                  <div class="upload-feedback" data-upload-feedback>Chưa chọn ảnh nào.</div>
+                  <button type="button" class="btn ghost btn-sm" data-upload-clear hidden>Xoá tất cả</button>
+                </div>
+              </div>
+            </label>
+            <label class="field-group">
+              <span>Ghi chú cho người bán</span>
+              <textarea name="note" rows="2" placeholder="Ví dụ: Giao giờ hành chính, gọi trước 15 phút..."></textarea>
+            </label>
+          </div>
+          <div class="order-form__side">
+            <div class="info-card info-card--contact">
+              <h3>Thông tin người nhận</h3>
+              <label>
+                <span>Họ và tên</span>
+                <input type="text" value="{{fulfillment.order.buyer.name}}" readonly placeholder="Cập nhật trong hồ sơ" />
+              </label>
+              <label>
+                <span>Số điện thoại</span>
+                <input type="text" value="{{fulfillment.order.buyer.phone}}" readonly placeholder="Cập nhật trong hồ sơ" />
+              </label>
+            </div>
+            <div class="info-card info-card--summary">
+              <h3>Thông tin đơn hàng</h3>
+              <dl class="order-summary">
+                <div>
+                  <dt>Sản phẩm</dt>
+                  <dd>{{product.title}}</dd>
+                </div>
+                <div>
+                  <dt>Số lượng</dt>
+                  <dd>1</dd>
+                </div>
+                <div>
+                  <dt>Giá thắng</dt>
+                  <dd>
+                    {{#if fulfillment.order.totalPrice}}
+                      {{formatCurrency fulfillment.order.totalPrice}}
+                    {{else}}
+                      {{formatCurrency product.currentPrice}}
+                    {{/if}}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Phí vận chuyển</dt>
+                  <dd class="text-muted">Đang cập nhật</dd>
+                </div>
+                <div class="order-summary__total">
+                  <dt>Tổng cộng</dt>
+                  <dd>
+                    {{#if fulfillment.order.totalPrice}}
+                      {{formatCurrency fulfillment.order.totalPrice}}
+                    {{else}}
+                      {{formatCurrency product.currentPrice}}
+                    {{/if}}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+          <div class="order-form__actions">
+            <button type="submit" class="btn primary">Tiếp theo</button>
+          </div>
+        </form>
+      {{else if fulfillment.order.invoice}}
+        <div class="info-grid">
+          <div class="info-card">
+            <h3>Hoá đơn thanh toán</h3>
+            <dl class="info-grid__list">
+              <div>
+                <dt>Phương thức</dt>
+                <dd>{{fulfillment.order.invoice.paymentMethod}}</dd>
+              </div>
+              <div>
+                <dt>Ghi chú</dt>
+                <dd>{{#if fulfillment.order.invoice.note}}{{fulfillment.order.invoice.note}}{{else}}—{{/if}}</dd>
+              </div>
+              <div>
+                <dt>Chứng từ</dt>
+                <dd>
+                  {{#if fulfillment.order.invoice.paymentProofFiles.length}}
+                    <ul class="invoice-proof-list">
+                      {{#each fulfillment.order.invoice.paymentProofFiles}}
+                        <li>
+                          <a href="{{this}}" target="_blank" rel="noopener">Hoá đơn {{add @index 1}}</a>
+                        </li>
+                      {{/each}}
+                    </ul>
+                  {{else if fulfillment.order.invoice.paymentProof}}
+                    {{fulfillment.order.invoice.paymentProof}}
+                  {{else}}
+                    —
+                  {{/if}}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div class="info-card">
+            <h3>Địa chỉ giao hàng</h3>
+            <p>{{fulfillment.order.invoice.shippingAddress}}</p>
+            <h4>Địa chỉ thanh toán</h4>
+            <p>{{#if fulfillment.order.invoice.billingAddress}}{{fulfillment.order.invoice.billingAddress}}{{else}}Không cung cấp{{/if}}</p>
+          </div>
         </div>
-      </li>
-    {{/each}}
-  </ol>
+      {{else}}
+        <p class="placeholder">Chưa có thông tin. Người mua vui lòng hoàn tất bước này.</p>
+      {{/if}}
+    </div>
+  </section>
 
-  <div class="fulfillment-grid">
-    <div class="fulfillment-column">
-      <section class="fulfillment-card" id="step-payment">
-        <header>
-          <h2>1. Thông tin thanh toán và giao hàng</h2>
-          <p>Người thắng đấu giá cần cung cấp thông tin chi tiết.</p>
-        </header>
-        {{#if fulfillment.canSubmitPayment}}
-          <form method="post" action="/orders/{{fulfillment.order.id}}/payment-details" class="fulfillment-form">
-            <label>
-              Phương thức thanh toán
-              <input type="text" name="paymentMethod" required placeholder="Ví dụ: Chuyển khoản ngân hàng" />
-            </label>
-            <label>
-              Địa chỉ thanh toán
-              <textarea name="billingAddress" rows="3" placeholder="Số nhà, phường/xã, quận/huyện, tỉnh/thành"></textarea>
-            </label>
-            <label>
-              Địa chỉ giao hàng
-              <textarea name="shippingAddress" rows="3" required></textarea>
-            </label>
-            <label>
-              Bằng chứng thanh toán (URL / mô tả)
-              <input type="text" name="paymentProof" placeholder="Link hoá đơn hoặc mô tả" />
-            </label>
-            <label>
-              Ghi chú cho người bán
-              <textarea name="note" rows="2"></textarea>
-            </label>
-            <button type="submit" class="btn primary">Gửi thông tin</button>
-          </form>
-        {{else if fulfillment.order.invoice}}
-          <dl class="info-list">
-            <div>
-              <dt>Phương thức</dt>
-              <dd>{{fulfillment.order.invoice.paymentMethod}}</dd>
+  <section
+    class="order-stage{{#if (isOrderStageActive fulfillment.order.status 'seller-confirm')}} is-active{{/if}}"
+    data-order-panel="seller-confirm"
+    id="step-confirm"
+    role="tabpanel"
+    aria-labelledby="order-tab-seller-confirm"
+    aria-hidden="{{#if (isOrderStageActive fulfillment.order.status 'seller-confirm')}}false{{else}}true{{/if}}"
+    {{#unless (isOrderStageActive fulfillment.order.status 'seller-confirm')}}hidden{{/unless}}
+  >
+    <header class="order-stage__header">
+      <div>
+        <p class="order-stage__eyebrow">Bước 2: Xác nhận</p>
+        <h2>Người bán xác nhận & gửi hàng</h2>
+        <p>Người bán xác nhận đã nhận đủ tiền và cập nhật mã vận đơn.</p>
+      </div>
+      <div class="order-stage__status">
+        <span class="stage-status">{{localizeFulfillmentStatus 'payment_confirmed_awaiting_delivery'}}</span>
+      </div>
+    </header>
+    <div class="order-stage__body">
+      {{#if fulfillment.canSellerConfirmShipment}}
+        <form method="post" action="/orders/{{fulfillment.order.id}}/payment-confirmation" class="order-form order-form--single" enctype="multipart/form-data">
+          <label class="field-group">
+            <span>Đơn vị vận chuyển *</span>
+            <select name="carrier" required>
+              <option value="">Chọn đơn vị vận chuyển</option>
+              <option value="Giao Hàng Nhanh">Giao Hàng Nhanh (GHN)</option>
+              <option value="Giao Hàng Tiết Kiệm">Giao Hàng Tiết Kiệm (GHTK)</option>
+              <option value="VNPost">VNPost</option>
+              <option value="J&T Express">J&T Express</option>
+              <option value="Viettel Post">Viettel Post</option>
+            </select>
+          </label>
+          <label class="field-group">
+            <span>Mã vận đơn *</span>
+            <input type="text" name="trackingNumber" placeholder="Nhập mã vận đơn" required />
+          </label>
+          <label class="field-group">
+            <span>Ngày gửi hàng dự kiến</span>
+            <input type="datetime-local" name="shippingDate" />
+          </label>
+          <label class="field-group">
+            <span>Link chứng từ (tuỳ chọn)</span>
+            <input type="url" name="invoiceUrl" placeholder="Dán link biên bản giao hàng hoặc ảnh hoá đơn" />
+          </label>
+          <div class="field-group field-group--upload">
+            <span>Hoặc tải ảnh chứng từ (tối đa 5 ảnh)</span>
+            <div class="upload-zone" id="shipmentProofUploadZone">
+              <input type="file" name="shipmentProofImages" id="shipmentProofInput" accept="image/*" multiple style="display:none;" />
+              <button type="button" class="btn outline upload-trigger" onclick="document.getElementById('shipmentProofInput').click()">
+                <i class="bi bi-cloud-upload"></i> Chọn ảnh
+              </button>
+              <small class="upload-hint">Kéo thả ảnh vào đây hoặc nhấn nút để chọn</small>
             </div>
+            <div class="upload-preview" id="shipmentProofPreview"></div>
+          </div>
+          <div class="order-form__actions">
+            <button type="button" class="btn ghost" data-order-tab-trigger="payment">Quay lại</button>
+            <button type="submit" class="btn primary">Tiếp theo</button>
+          </div>
+        </form>
+      {{else if fulfillment.order.shipment}}
+        <div class="status-card status-card--success">
+          <div>
+            <strong><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Xác nhận thanh toán</strong>
+            <p>Người bán đã xác nhận đã nhận đủ thanh toán cho đơn hàng này.</p>
+          </div>
+          <small>
+            {{#if fulfillment.order.shipment.createdAt}}
+              Xác nhận lúc: {{formatDate fulfillment.order.shipment.createdAt 'HH:mm:ss DD/MM/YYYY'}}
+            {{else}}
+              Đang cập nhật thời gian xác nhận
+            {{/if}}
+          </small>
+        </div>
+        <div class="info-card info-card--shipment">
+          <dl class="info-grid__list">
             <div>
-              <dt>Địa chỉ thanh toán</dt>
-              <dd>{{fulfillment.order.invoice.billingAddress}}</dd>
-            </div>
-            <div>
-              <dt>Địa chỉ giao hàng</dt>
-              <dd>{{fulfillment.order.invoice.shippingAddress}}</dd>
-            </div>
-            <div>
-              <dt>Ghi chú</dt>
-              <dd>{{fulfillment.order.invoice.note}}</dd>
-            </div>
-            <div>
-              <dt>Chứng từ</dt>
-              <dd>{{#if fulfillment.order.invoice.paymentProof}}{{fulfillment.order.invoice.paymentProof}}{{else}}—{{/if}}</dd>
-            </div>
-          </dl>
-        {{else}}
-          <p class="placeholder">Chưa có thông tin. Người mua vui lòng hoàn tất bước này.</p>
-        {{/if}}
-      </section>
-
-      <section class="fulfillment-card" id="step-shipping">
-        <header>
-          <h2>2. Người bán xác nhận & gửi hàng</h2>
-          <p>Người bán phải xác nhận đã nhận đủ tiền và cung cấp mã vận đơn.</p>
-        </header>
-        {{#if fulfillment.canSellerConfirmShipment}}
-          <form method="post" action="/orders/{{fulfillment.order.id}}/payment-confirmation" class="fulfillment-form">
-            <label>
-              Đơn vị vận chuyển
-              <input type="text" name="carrier" placeholder="GHN, Viettel Post..." required />
-            </label>
-            <label>
-              Mã vận đơn
-              <input type="text" name="trackingNumber" required />
-            </label>
-            <label>
-              Ngày gửi hàng
-              <input type="datetime-local" name="shippingDate" />
-            </label>
-            <label>
-              Link hoá đơn / chứng từ vận chuyển
-              <input type="text" name="invoiceUrl" />
-            </label>
-            <button type="submit" class="btn primary">Xác nhận & cập nhật vận chuyển</button>
-          </form>
-        {{else if fulfillment.order.shipment}}
-          <dl class="info-list">
-            <div>
-              <dt>Đơn vị</dt>
+              <dt>Đơn vị vận chuyển</dt>
               <dd>{{fulfillment.order.shipment.carrier}}</dd>
             </div>
             <div>
@@ -147,136 +339,313 @@
               <dd>{{fulfillment.order.shipment.trackingNumber}}</dd>
             </div>
             <div>
-              <dt>Ngày gửi</dt>
-              <dd>{{formatDate fulfillment.order.shipment.shippingDate 'DD/MM/YYYY HH:mm'}}</dd>
+              <dt>Ngày gửi hàng</dt>
+              <dd>
+                {{#if fulfillment.order.shipment.shippingDate}}
+                  {{formatDate fulfillment.order.shipment.shippingDate 'DD/MM/YYYY HH:mm'}}
+                {{else}}
+                  Đang cập nhật
+                {{/if}}
+              </dd>
             </div>
             <div>
-              <dt>Hoá đơn</dt>
+              <dt>Chứng từ vận chuyển</dt>
               <dd>
                 {{#if fulfillment.order.shipment.invoiceUrl}}
-                  <a href="{{fulfillment.order.shipment.invoiceUrl}}" target="_blank" rel="noopener">Xem tài liệu</a>
+                  <a href="{{fulfillment.order.shipment.invoiceUrl}}" target="_blank" rel="noopener">Xem link tài liệu</a>
                 {{else}}
                   —
                 {{/if}}
               </dd>
             </div>
+            {{#if fulfillment.order.shipment.proofImages}}
+            <div class="shipment-proof-gallery">
+              <dt>Ảnh chứng từ</dt>
+              <dd>
+                <div class="proof-images-grid">
+                  {{#each fulfillment.order.shipment.proofImages}}
+                    <a href="{{this}}" target="_blank" rel="noopener" class="proof-image-link">
+                      <img src="{{this}}" alt="Chứng từ {{@index}}" class="proof-image-thumb" />
+                    </a>
+                  {{/each}}
+                </div>
+              </dd>
+            </div>
+            {{/if}}
           </dl>
-        {{else}}
-          <p class="placeholder">Đang chờ người bán xác nhận.</p>
-        {{/if}}
-      </section>
-
-      <section class="fulfillment-card" id="step-delivery">
-        <header>
-          <h2>3. Người mua xác nhận nhận hàng</h2>
-          <p>Sau khi nhận hàng, hãy xác nhận để mở form đánh giá.</p>
-        </header>
-        {{#if fulfillment.canBuyerConfirmDelivery}}
-          <form method="post" action="/orders/{{fulfillment.order.id}}/delivery-confirmation" class="fulfillment-form">
-            <button type="submit" class="btn primary">Tôi đã nhận đủ hàng</button>
-          </form>
-        {{else}}
-          {{#if (eq fulfillment.order.status 'transaction_completed')}}
-            <p class="placeholder">Bạn đã xác nhận nhận hàng.</p>
-          {{else}}
-            <p class="placeholder">Chờ vận chuyển hoàn tất.</p>
-          {{/if}}
-        {{/if}}
-      </section>
-
-      <section class="fulfillment-card" id="step-feedback">
-        <header>
-          <h2>4. Đánh giá giao dịch</h2>
-          <p>Mỗi bên có thể chấm điểm +1 / -1 kèm ghi chú. Có thể chỉnh sửa bất kỳ lúc nào.</p>
-        </header>
-        {{#if fulfillment.showFeedbackForms}}
-          <div class="feedback-grid">
-            {{#if fulfillment.isWinner}}
-              <form method="post" action="/orders/{{fulfillment.order.id}}/feedback" class="feedback-form">
-                <h3>Bạn đánh giá người bán</h3>
-                <div class="feedback-options">
-                  <label>
-                    <input type="radio" name="score" value="1" {{#if (eq fulfillment.order.ratings.buyerToSeller.score 1)}}checked{{/if}} />
-                    Tích cực (+1)
-                  </label>
-                  <label>
-                    <input type="radio" name="score" value="-1" {{#if (eq fulfillment.order.ratings.buyerToSeller.score -1)}}checked{{/if}} />
-                    Tiêu cực (-1)
-                  </label>
-                </div>
-                <textarea name="comment" rows="3" placeholder="Nhận xét ngắn">{{fulfillment.order.ratings.buyerToSeller.comment}}</textarea>
-                <button type="submit" class="btn primary">Lưu đánh giá</button>
-              </form>
-            {{/if}}
-            {{#if fulfillment.isSeller}}
-              <form method="post" action="/orders/{{fulfillment.order.id}}/feedback" class="feedback-form">
-                <h3>Bạn đánh giá người mua</h3>
-                <div class="feedback-options">
-                  <label>
-                    <input type="radio" name="score" value="1" {{#if (eq fulfillment.order.ratings.sellerToBuyer.score 1)}}checked{{/if}} />
-                    Tích cực (+1)
-                  </label>
-                  <label>
-                    <input type="radio" name="score" value="-1" {{#if (eq fulfillment.order.ratings.sellerToBuyer.score -1)}}checked{{/if}} />
-                    Tiêu cực (-1)
-                  </label>
-                </div>
-                <textarea name="comment" rows="3" placeholder="Nhận xét ngắn">{{fulfillment.order.ratings.sellerToBuyer.comment}}</textarea>
-                <button type="submit" class="btn primary">Lưu đánh giá</button>
-              </form>
-            {{/if}}
-          </div>
-        {{else}}
-          <p class="placeholder">Đánh giá sẽ mở khi người mua xác nhận đã nhận hàng.</p>
-        {{/if}}
-      </section>
+        </div>
+      {{else}}
+        <p class="placeholder">Đang chờ người bán xác nhận thông tin thanh toán từ người mua.</p>
+      {{/if}}
     </div>
+  </section>
 
-    <aside class="fulfillment-column fulfillment-column--side" id="chat">
-      <section class="fulfillment-card chat-panel">
-        <header>
-          <h2>Trao đổi giữa người bán & người mua</h2>
-          <p>Thông tin sẽ chỉ hiển thị cho hai bên.</p>
-        </header>
-        <div class="chat-thread" data-chat-thread>
-          {{#if fulfillment.order.chatMessages.length}}
-            {{#each fulfillment.order.chatMessages}}
-              <article class="chat-message">
+  <section
+    class="order-stage{{#if (isOrderStageActive fulfillment.order.status 'delivery')}} is-active{{/if}}"
+    data-order-panel="delivery"
+    id="step-delivery"
+    role="tabpanel"
+    aria-labelledby="order-tab-delivery"
+    aria-hidden="{{#if (isOrderStageActive fulfillment.order.status 'delivery')}}false{{else}}true{{/if}}"
+    {{#unless (isOrderStageActive fulfillment.order.status 'delivery')}}hidden{{/unless}}
+  >
+    <header class="order-stage__header">
+      {{#if seller}}
+        <div>
+          <p class="order-stage__eyebrow">Bước 3: Vận chuyển</p>
+          <h2>Đơn hàng đang được vận chuyển đến người mua</h2>
+        </div>
+      {{else}}
+      <div>
+        <p class="order-stage__eyebrow">Bước 3: Nhận hàng</p>
+        <h2>Xác nhận đã nhận hàng</h2>
+      </div>
+      {{/if}}
+      <div class="order-stage__status">
+        <span class="stage-status">{{localizeFulfillmentStatus 'delivery_confirmed_ready_to_rate'}}</span>
+      </div>
+    </header>
+    <div class="order-stage__body">
+      <div class="tracking-card">
+        <h3>Thông tin vận chuyển</h3>
+        {{#if fulfillment.order.shipment}}
+          <p class="tracking-card__code">Mã vận đơn: {{fulfillment.order.shipment.trackingNumber}}</p>
+          <ul class="tracking-timeline">
+            <li class="tracking-item {{#if fulfillment.order.shipment}}is-complete{{/if}}">
+              <span class="tracking-dot"></span>
+              <div>
+                <strong>Đơn hàng đã được gửi đi</strong>
+                <small>
+                  {{#if fulfillment.order.shipment.shippingDate}}
+                    {{formatDate fulfillment.order.shipment.shippingDate 'DD/MM/YYYY HH:mm'}}
+                  {{else}}
+                    Đang cập nhật thời gian gửi
+                  {{/if}}
+                </small>
+              </div>
+            </li>
+            <li class="tracking-item {{#if (or (eq fulfillment.order.status 'delivery_confirmed_ready_to_rate') (eq fulfillment.order.status 'transaction_completed'))}}is-complete{{/if}}">
+              <span class="tracking-dot"></span>
+              <div>
+                <strong>Đang vận chuyển</strong>
+                <small>Cập nhật mới nhất tự động từ đơn vị vận chuyển</small>
+              </div>
+            </li>
+            <li class="tracking-item {{#if (eq fulfillment.order.status 'transaction_completed')}}is-complete{{/if}}">
+              <span class="tracking-dot"></span>
+              <div>
+                <strong>Đang giao hàng</strong>
+                <small>
+                  {{#if (eq fulfillment.order.status 'transaction_completed')}}
+                    Đã xác nhận lúc {{formatDate fulfillment.order.updatedAt 'DD/MM/YYYY HH:mm'}}
+                  {{else}}
+                    {{#if fulfillment.order.shipment.shippingDate}}
+                      Dự kiến {{formatDate fulfillment.order.shipment.shippingDate 'DD/MM/YYYY'}} + 2 ngày
+                    {{else}}
+                      Đang cập nhật dự kiến giao hàng
+                    {{/if}}
+                  {{/if}}
+                </small>
+              </div>
+            </li>
+          </ul>
+        {{else}}
+          <p class="placeholder">Thông tin vận chuyển sẽ hiển thị sau khi người bán cập nhật mã vận đơn.</p>
+        {{/if}}
+      </div>
+      {{#if fulfillment.canBuyerConfirmDelivery}}
+        <form method="post" action="/orders/{{fulfillment.order.id}}/delivery-confirmation" class="delivery-confirm-form">
+          <label class="checkbox">
+            <input type="checkbox" name="confirmProduct" required />
+            <span>Tôi đã kiểm tra sản phẩm và xác nhận sản phẩm đúng như mô tả.</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="confirmQuality" />
+            <span>Tôi xác nhận sản phẩm không bị hư hỏng trong quá trình vận chuyển.</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="confirmCompleted" required />
+            <span>Tôi xác nhận đã nhận hàng và hoàn tất giao dịch.</span>
+          </label>
+          <div class="order-note order-note--warning">
+            <strong>Lưu ý:</strong> Sau khi xác nhận nhận hàng, tiền sẽ được chuyển cho người bán. Vui lòng kiểm tra kỹ sản phẩm trước khi xác nhận.
+          </div>
+          <div class="order-form__actions">
+            <button type="button" class="btn ghost" data-order-tab-trigger="seller-confirm">Quay lại</button>
+            <button type="submit" class="btn primary">Tiếp theo</button>
+          </div>
+        </form>
+      {{else}}
+        {{#if (eq fulfillment.order.status 'transaction_completed')}}
+          <p class="placeholder">Bạn đã xác nhận nhận hàng.</p>
+        {{else}}
+          <p class="placeholder">Chờ vận chuyển hoàn tất để xác nhận.</p>
+        {{/if}}
+      {{/if}}
+    </div>
+  </section>
+
+  <section
+    class="order-stage{{#if (isOrderStageActive fulfillment.order.status 'feedback')}} is-active{{/if}}"
+    data-order-panel="feedback"
+    id="rating"
+    role="tabpanel"
+    aria-labelledby="order-tab-feedback"
+    aria-hidden="{{#if (isOrderStageActive fulfillment.order.status 'feedback')}}false{{else}}true{{/if}}"
+    {{#unless (isOrderStageActive fulfillment.order.status 'feedback')}}hidden{{/unless}}
+  >
+    <header class="order-stage__header">
+      <div>
+        <p class="order-stage__eyebrow">Bước 4: Đánh giá</p>
+        <h2>Đánh giá giao dịch</h2>
+        <p>Đánh giá giúp xây dựng niềm tin trong cộng đồng.</p>
+      </div>
+      <div class="order-stage__status">
+        <span class="stage-status">{{localizeFulfillmentStatus 'transaction_completed'}}</span>
+      </div>
+    </header>
+    <div class="order-stage__body">
+      {{#if fulfillment.showFeedbackForms}}
+        <div class="rating-grid">
+          {{#if fulfillment.isWinner}}
+            <form method="post" action="/orders/{{fulfillment.order.id}}/feedback" class="rating-card" data-rating-card>
+              <div class="rating-card__header">
                 <div>
-                  <strong>{{senderName}}</strong>
-                  <span>{{formatDate createdAt 'DD/MM/YYYY HH:mm'}}</span>
+                  <p>Đánh giá người bán</p>
                 </div>
-                <p>{{message}}</p>
-              </article>
-            {{/each}}
-          {{else}}
-            <p class="placeholder">Chưa có tin nhắn nào.</p>
+                <div class="rating-card__avatar">{{initial product.seller.name}}</div>
+              </div>
+              <div class="rating-stars" aria-hidden="true" data-rating-stars>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <span>{{#if fulfillment.order.ratings.buyerToSeller.score}}Đã đánh giá{{else}}Chưa đánh giá{{/if}}</span>
+              </div>
+              <div class="rating-quick">
+                <label class="chip chip--positive">
+                  <input type="radio" name="score" value="1" {{#if (eq fulfillment.order.ratings.buyerToSeller.score 1)}}checked{{/if}} />
+                  <span>Tích cực</span>
+                </label>
+                <label class="chip chip--negative">
+                  <input type="radio" name="score" value="-1" {{#if (eq fulfillment.order.ratings.buyerToSeller.score -1)}}checked{{/if}} />
+                  <span>Tiêu cực</span>
+                </label>
+              </div>
+              <label class="field-group">
+                <span>Nhận xét *</span>
+                <textarea id="buyer-rating-comment" name="comment" rows="3" placeholder="Chia sẻ trải nghiệm của bạn về người bán (sản phẩm, dịch vụ, giao hàng...)" required>{{fulfillment.order.ratings.buyerToSeller.comment}}</textarea>
+              </label>
+              <div class="chip-cloud">
+                <button type="button" class="chip chip--ghost" data-fill-comment="Sản phẩm đúng mô tả" data-target="#buyer-rating-comment">Sản phẩm đúng mô tả</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Giao hàng nhanh" data-target="#buyer-rating-comment">Giao hàng nhanh</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Đóng gói cẩn thận" data-target="#buyer-rating-comment">Đóng gói cẩn thận</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Nhiệt tình" data-target="#buyer-rating-comment">Nhiệt tình</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Giá tốt" data-target="#buyer-rating-comment">Giá tốt</button>
+              </div>
+              <div class="order-form__actions">
+                <button type="submit" class="btn primary">Hoàn tất đánh giá</button>
+              </div>
+            </form>
+          {{/if}}
+
+          {{#if fulfillment.isSeller}}
+            <form method="post" action="/orders/{{fulfillment.order.id}}/feedback" class="rating-card" data-rating-card>
+              <div class="rating-card__header">
+                <div>
+                  <p>Đánh giá người mua</p>
+                </div>
+                <div class="rating-card__avatar rating-card__avatar--buyer">{{initial fulfillment.order.buyer.name}}</div>
+              </div>
+              <div class="rating-stars" aria-hidden="true" data-rating-stars>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <i class="bi bi-star"></i>
+                <span>{{#if fulfillment.order.ratings.sellerToBuyer.score}}Đã đánh giá{{else}}Chưa đánh giá{{/if}}</span>
+              </div>
+              <div class="rating-quick">
+                <label class="chip chip--positive">
+                  <input type="radio" name="score" value="1" {{#if (eq fulfillment.order.ratings.sellerToBuyer.score 1)}}checked{{/if}} />
+                  <span>Tích cực</span>
+                </label>
+                <label class="chip chip--negative">
+                  <input type="radio" name="score" value="-1" {{#if (eq fulfillment.order.ratings.sellerToBuyer.score -1)}}checked{{/if}} />
+                  <span>Tiêu cực</span>
+                </label>
+              </div>
+              <label class="field-group">
+                <span>Nhận xét *</span>
+                <textarea id="seller-rating-comment" name="comment" rows="3" placeholder="Chia sẻ trải nghiệm của bạn về người mua (thanh toán, giao tiếp...)" required>{{fulfillment.order.ratings.sellerToBuyer.comment}}</textarea>
+              </label>
+              <div class="chip-cloud">
+                <button type="button" class="chip chip--ghost" data-fill-comment="Thanh toán nhanh" data-target="#seller-rating-comment">Thanh toán nhanh</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Lịch sự" data-target="#seller-rating-comment">Lịch sự</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Dễ tính" data-target="#seller-rating-comment">Dễ tính</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Giao tiếp tốt" data-target="#seller-rating-comment">Giao tiếp tốt</button>
+                <button type="button" class="chip chip--ghost" data-fill-comment="Uy tín" data-target="#seller-rating-comment">Uy tín</button>
+              </div>
+              <div class="order-form__actions">
+                <button type="submit" class="btn primary">Hoàn tất đánh giá</button>
+              </div>
+            </form>
           {{/if}}
         </div>
-        {{#unless fulfillment.isCanceled}}
-          <form method="post" action="/orders/{{fulfillment.order.id}}/chat" class="chat-form">
-            <textarea name="message" rows="3" placeholder="Nhập tin nhắn..." required></textarea>
-            <button type="submit" class="btn secondary">Gửi</button>
-          </form>
-        {{/unless}}
-      </section>
-
-      {{#if fulfillment.canCancelOrder}}
-        <section class="fulfillment-card">
-          <header>
-            <h3>Huỷ giao dịch</h3>
-            <p>Chỉ dùng khi người mua không tuân thủ quy định thanh toán.</p>
-          </header>
-          <form method="post" action="/orders/{{fulfillment.order.id}}/cancel" class="fulfillment-form">
-            <label>
-              Lý do huỷ
-              <textarea name="reason" rows="3" placeholder="Không thanh toán trong 24h..." required></textarea>
-            </label>
-            <button type="submit" class="btn danger">Huỷ giao dịch</button>
-          </form>
-        </section>
+      {{else}}
+        <p class="placeholder">Đánh giá sẽ mở khi người mua xác nhận đã nhận hàng.</p>
       {{/if}}
-    </aside>
+    </div>
+  </section>
+  </div>
+
+  <div class="order-aux-grid" id="chat">
+    <section class="order-stage order-stage--sub chat-panel">
+      <header>
+        <h2>Trao đổi giữa người bán & người mua</h2>
+        <p>Thông tin chỉ hiển thị cho hai bên.</p>
+      </header>
+      <div class="chat-thread" data-chat-thread>
+        {{#if fulfillment.order.chatMessages.length}}
+          {{#each fulfillment.order.chatMessages}}
+            <article class="chat-message">
+              <div>
+                <strong>{{senderName}}</strong>
+                <span>{{formatDate createdAt 'DD/MM/YYYY HH:mm'}}</span>
+              </div>
+              <p>{{message}}</p>
+            </article>
+          {{/each}}
+        {{else}}
+          <p class="placeholder">Chưa có tin nhắn nào.</p>
+        {{/if}}
+      </div>
+      {{#unless fulfillment.isCanceled}}
+        <form method="post" action="/orders/{{fulfillment.order.id}}/chat" class="chat-form">
+          <textarea name="message" rows="3" placeholder="Nhập tin nhắn..." required></textarea>
+          <button type="submit" class="btn secondary">Gửi</button>
+        </form>
+      {{/unless}}
+    </section>
+
+    {{#if fulfillment.canCancelOrder}}
+      <section class="order-stage order-stage--sub">
+        <header>
+          <h2>Huỷ giao dịch</h2>
+          <p>Chỉ dùng khi người mua không hoàn tất thanh toán theo quy định.</p>
+        </header>
+        <form method="post" action="/orders/{{fulfillment.order.id}}/cancel" class="order-form order-form--single">
+          <label class="field-group">
+            <span>Lý do huỷ *</span>
+            <textarea name="reason" rows="3" placeholder="Không thanh toán trong 24h..." required></textarea>
+          </label>
+          <div class="order-form__actions">
+            <button type="submit" class="btn danger">Huỷ giao dịch</button>
+          </div>
+        </form>
+      </section>
+    {{/if}}
   </div>
 
   {{#if relatedProducts.length}}

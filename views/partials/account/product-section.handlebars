@@ -1,0 +1,170 @@
+{{#if bidder}}
+<section class="account-section bidder-auctions">
+	<div class="section-header section-header--stacked">
+		<div>
+			<h2>Phiên đấu giá đang tham gia</h2>
+			<p>Theo dõi những sản phẩm bạn đang đặt giá để không bỏ lỡ thời điểm quan trọng.</p>
+		</div>
+		<span class="badge">{{bidder.activeBids.length}} phiên</span>
+	</div>
+	{{#if bidder.activeBids.length}}
+		<div class="bidder-auction-list">
+			{{#each bidder.activeBids}}
+			<article class="bidder-auction-card{{#if (eq bidStatus 'leading')}} is-leading{{/if}}{{#if (eq bidStatus 'outbid')}} is-outbid{{/if}}">
+				<div class="bidder-auction-card__media">
+					<img src="{{images.[0]}}" alt="{{title}}" loading="lazy" />
+				</div>
+				<div class="bidder-auction-card__body">
+					<div class="bidder-auction-card__top">
+						<div>
+							<h3><a href="/products/{{id}}">{{title}}</a></h3>
+							<div class="bidder-auction-card__seller">
+								<div class="seller-avatar" aria-hidden="true">{{initial seller.name}}</div>
+								<div>
+									<p>{{#if seller.name}}{{seller.name}}{{else}}Người bán ẩn danh{{/if}}</p>
+									<small>Đánh giá: {{seller.ratingPlus}} 👍 · {{seller.ratingMinus}} 👎</small>
+								</div>
+							</div>
+						</div>
+						<div class="bidder-auction-card__status">
+							{{#if (eq bidStatus 'leading')}}
+								<span class="status-chip status-chip--success"><i class="bi bi-trophy-fill" aria-hidden="true"></i>Đang dẫn đầu</span>
+							{{else}}
+								{{#if (eq bidStatus 'outbid')}}
+									<span class="status-chip status-chip--warning"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>Đã bị vượt</span>
+								{{else}}
+									<span class="status-chip status-chip--neutral"><i class="bi bi-eye-fill" aria-hidden="true"></i>Đang theo dõi</span>
+								{{/if}}
+							{{/if}}
+						</div>
+					</div>
+					<div class="bidder-auction-card__stats">
+						<div class="bidder-auction-card__stat">
+							<span>Giá hiện tại</span>
+							<strong>{{formatCurrency currentPrice}}</strong>
+						</div>
+						<div class="bidder-auction-card__stat">
+							<span>Giá của tôi</span>
+							{{#if myBid}}
+								<strong class="{{#if (eq bidStatus 'leading')}}text-positive{{else}}text-negative{{/if}}">{{formatCurrency myBid}}</strong>
+							{{else}}
+								<strong>—</strong>
+							{{/if}}
+						</div>
+						<div class="bidder-auction-card__stat">
+							<span>Số lượt đặt</span>
+							<strong>{{bidCount}} lượt</strong>
+						</div>
+						<div class="bidder-auction-card__stat">
+							<span>Thời gian còn lại</span>
+							<strong>{{countdown endDate}}</strong>
+						</div>
+					</div>
+					<div class="bidder-auction-card__actions">
+						<a href="/products/{{id}}" class="btn primary">Đặt giá cao hơn</a>
+						<a href="/products/{{id}}" class="btn tertiary">Xem chi tiết</a>
+					</div>
+				</div>
+			</article>
+			{{/each}}
+		</div>
+	{{else}}
+		<div class="empty-state">Bạn chưa tham gia phiên đấu giá nào. Khám phá sản phẩm để bắt đầu!</div>
+	{{/if}}
+</section>
+
+<section class="account-section bidder-wins">
+	<div class="section-header section-header--stacked">
+		<div>
+			<h2>Sản phẩm đã thắng</h2>
+			<p>Danh sách các phiên mà bạn đã giành chiến thắng gần đây.</p>
+		</div>
+		<span class="badge">{{bidder.wins.length}} sản phẩm</span>
+	</div>
+	{{#if bidder.wins.length}}
+		<div class="bidder-win-list">
+			{{#each bidder.wins}}
+			<article class="bidder-win-card">
+				<div class="bidder-win-card__media">
+					<img src="{{images.[0]}}" alt="{{title}}" loading="lazy" />
+				</div>
+				<div class="bidder-win-card__body">
+					<div class="bidder-win-card__header">
+						<div>
+							<h3><a href="/products/{{id}}">{{title}}</a></h3>
+							<div class="bidder-win-card__seller">
+								<div class="seller-avatar" aria-hidden="true">{{initial seller.name}}</div>
+								<div>
+									<p>{{seller.name}}</p>
+									<small>{{seller.badges.[0]}}</small>
+								</div>
+							</div>
+						</div>
+						{{#if order}}
+							<div class="bidder-win-card__status">
+								<span class="status-chip win-status-chip {{#if (eq order.status 'transaction_completed')}}{{#if order.hasRated}}status-chip--success{{else}}status-chip--info{{/if}}{{else}}{{#if (eq order.status 'delivery_confirmed_ready_to_rate')}}status-chip--info{{else}}status-chip--warning{{/if}}{{/if}}">
+									<i class="bi bi-trophy-fill" aria-hidden="true"></i>
+									{{#if (eq order.status 'transaction_completed')}}{{#if order.hasRated}}Đã đánh giá{{else}}Chờ đánh giá{{/if}}{{else}}{{localizeFulfillmentStatus order.status}}{{/if}}
+								</span>
+							</div>
+						{{/if}}
+					</div>
+					<div class="bidder-win-card__stats">
+						<div>
+							<span>Giá thắng</span>
+							<strong>
+								{{#if order}}
+									{{#if order.totalPrice}}
+										{{formatCurrency order.totalPrice}}
+									{{else}}
+										{{formatCurrency currentPrice}}
+									{{/if}}
+								{{else}}
+									{{formatCurrency currentPrice}}
+								{{/if}}
+							</strong>
+						</div>
+						<div>
+							<span>Ngày thắng</span>
+							<strong>
+								{{#if order}}
+									{{formatDate order.createdAt 'DD/MM/YYYY'}}
+								{{else}}
+									{{formatDate endDate 'DD/MM/YYYY'}}
+								{{/if}}
+							</strong>
+						</div>
+						<div>
+							<span>Tổng lượt đặt</span>
+							<strong>{{bidCount}} lượt</strong>
+						</div>
+					</div>
+					<div class="bidder-win-card__actions">
+						{{#if order}}
+							{{#if (eq order.status 'awaiting_payment_details')}}
+								<a href="/products/{{id}}?focus=payment" class="btn success">Thanh toán ngay</a>
+							{{else if (eq order.status 'payment_confirmed_awaiting_delivery')}}
+								<button class="btn tertiary" disabled>Đã thanh toán</button>
+							{{else if (eq order.status 'delivery_confirmed_ready_to_rate')}}
+								<button class="btn tertiary" disabled>Đã thanh toán</button>
+							{{else if (eq order.status 'transaction_completed')}}
+								{{#if order.hasRated}}
+									<a href="/products/{{id}}#rating" class="btn secondary">Chỉnh sửa đánh giá</a>
+								{{else}}
+									<a href="/products/{{id}}#rating" class="btn primary">Đánh giá ngay</a>
+								{{/if}}
+							{{else}}
+								<button class="btn tertiary" disabled>Hoàn tất</button>
+							{{/if}}
+						{{/if}}
+						<a href="/products/{{id}}" class="btn ghost">Xem chi tiết</a>
+					</div>
+				</div>
+			</article>
+			{{/each}}
+		</div>
+	{{else}}
+		<div class="empty-state">Hãy tiếp tục đấu giá để trở thành người chiến thắng trong phiên tiếp theo.</div>
+	{{/if}}
+</section>
+{{/if}}

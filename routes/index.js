@@ -33,18 +33,32 @@ router.get('/', async (req, res, next) => {
 
 router.get('/search', async (req, res, next) => {
   try {
-    const { q, sort = 'endingSoon', category } = req.query;
-    const results = await dataService.searchProducts(q, { sort, categoryId: category });
+    const { q, sort, category, page = 1 } = req.query;
+    // Default to 'relevance' when searching, otherwise 'endingSoon'
+    const effectiveSort = sort || (q && q.trim() ? 'relevance' : 'endingSoon');
+    const currentPage = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = 12;
+
+    const searchResult = await dataService.searchProducts(q, { 
+      sort: effectiveSort, 
+      categoryId: category,
+      page: currentPage,
+      limit: pageSize
+    });
 
     const watchSet = buildWatchSet(req.watchlistProductIds || req.currentUser?.watchlistIds);
-    applyWatchStateToList(results, watchSet);
+    applyWatchStateToList(searchResult.products, watchSet);
 
     res.render('search/results', {
       query: q,
-      results,
-      sort,
+      results: searchResult.products,
+      sort: effectiveSort,
       selectedCategory: category,
-      total: results.length,
+      total: searchResult.total,
+      page: searchResult.page,
+      totalPages: searchResult.totalPages,
+      hasNextPage: searchResult.page < searchResult.totalPages,
+      hasPrevPage: searchResult.page > 1,
     });
   } catch (error) {
     next(error);

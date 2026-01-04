@@ -42,6 +42,15 @@ function resolveDatabasePassword() {
 const config = {
   recaptchaSiteKey: getEnvString('RECAPTCHA_SITE_KEY'),
   recaptchaSecret: getEnvString('RECAPTCHA_SECRET'),
+  mailer: {
+    host: getEnvString('SMTP_HOST'),
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: parseBool(process.env.SMTP_SECURE, false),
+    user: getEnvString('SMTP_USER'),
+    pass: getEnvString('SMTP_PASS'),
+    fromName: getEnvString('EMAIL_FROM_NAME', 'Auction Web'),
+    fromAddress: getEnvString('EMAIL_FROM_ADDRESS'),
+  },
   database: {
     host: getEnvString('DATABASE_HOST', 'localhost'),
     port: Number(process.env.DATABASE_PORT || 5432),
@@ -60,5 +69,15 @@ const config = {
 if (typeof config.database.password !== 'string') {
   config.database.password = String(config.database.password || '');
 }
+
+if (!config.mailer.fromAddress && config.mailer.user) {
+  config.mailer.fromAddress = config.mailer.user;
+}
+
+['host', 'user', 'pass', 'fromAddress'].forEach((key) => {
+  if (config.mailer[key] == null) {
+    config.mailer[key] = '';
+  }
+});
 
 module.exports = config;

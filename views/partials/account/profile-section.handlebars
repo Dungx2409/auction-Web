@@ -1,4 +1,18 @@
 <section id="profile" class="account-section account-profile">
+  {{#if showUpgradeSuccessNotification}}
+  <div class="upgrade-success-banner" data-upgrade-success-banner>
+    <div class="upgrade-success-content">
+      <span class="upgrade-success-icon">🎉</span>
+      <div class="upgrade-success-text">
+        <strong>Chúc mừng! Bạn đã trở thành Người bán</strong>
+        <p>Tài khoản của bạn đã được nâng cấp thành công. Giờ đây bạn có thể đăng sản phẩm đấu giá và bắt đầu kinh doanh.</p>
+      </div>
+      <button type="button" class="upgrade-success-close" data-upgrade-success-close aria-label="Đóng">✕</button>
+    </div>
+    <a href="/account/products" class="btn primary upgrade-success-action">Bắt đầu đăng sản phẩm</a>
+  </div>
+  {{/if}}
+
   <header class="section-header">
     <h2>Thông tin cá nhân</h2>
     <p>Cập nhật thông tin liên hệ và tên hiển thị của bạn.</p>
@@ -14,7 +28,7 @@
         <div class="account-form-grid">
           <div class="form-field {{#if profileErrors.name}}has-error{{/if}}">
             <label for="profile-name">Họ và tên</label>
-            <input id="profile-name" type="text" name="name" value="{{profileForm.name}}" required />
+            <input id="profile-name" type="text" name="name" value="{{profileForm.name}}" required data-min-length="2" data-max-length="100" />
             {{#if profileErrors.name}}<span class="field-error">{{profileErrors.name}}</span>{{/if}}
         </div>
 
@@ -34,6 +48,50 @@
           <button type="submit" class="btn primary">Cập nhật thông tin</button>
         </div>
       </form>
+
+      {{#if accountRatings}}
+      <section class="account-card rating-history-card">
+        <div class="rating-history-header">
+          <div>
+            <h3>Đánh giá gần đây</h3>
+            <p>Xem chi tiết các lần bạn được chấm điểm và lời nhận xét từ người bán.</p>
+          </div>
+          <span class="rating-history-total">{{accountRatings.summary.total}} lượt</span>
+        </div>
+
+        {{#if accountRatings.history.length}}
+        <ul class="rating-timeline">
+          {{#each accountRatings.history}}
+          <li class="rating-timeline__item {{#if (gt score 0)}}is-positive{{else}}is-negative{{/if}}">
+            <div class="rating-timeline__head">
+              <div class="rating-reviewer">
+                <div class="rating-avatar">
+                  <i class="bi bi-person-circle" aria-hidden="true"></i>
+                </div>
+                <div class="rating-reviewer__details">
+                  <p class="rating-reviewer__name">{{#if reviewer}}{{reviewer.name}}{{else}}Người dùng ẩn danh{{/if}}</p>
+                  <p class="rating-reviewer__date">{{formatDate createdAt 'DD [tháng] MM, YYYY'}}</p>
+                  {{#if product}}
+                    <a href="/products/{{product.id}}" class="rating-reviewer__product">Sản phẩm: {{product.title}}</a>
+                  {{/if}}
+                </div>
+              </div>
+              <div class="rating-chip" aria-label="Điểm đánh giá">
+                <span class="rating-chip__icon">{{#if (gt score 0)}}👍{{else}}👎{{/if}}</span>
+                <span class="rating-chip__value">{{#if (gt score 0)}}+1{{else}}-1{{/if}}</span>
+              </div>
+            </div>
+            <div class="rating-comment-bubble">
+              {{#if comment}}{{comment}}{{else}}Người đánh giá không để lại ghi chú.{{/if}}
+            </div>
+          </li>
+          {{/each}}
+        </ul>
+        {{else}}
+        <p class="rating-empty-state">Bạn chưa nhận được đánh giá nào.</p>
+        {{/if}}
+      </section>
+      {{/if}}
     </div>
 
     <aside class="account-panel-aside">
@@ -54,6 +112,78 @@
           </li>
         </ul>
       </div>
+
+      {{#if accountRatings}}
+      <div class="account-card account-card--ratings">
+        <h3>Điểm đánh giá</h3>
+        <div class="rating-summary">
+          <div class="rating-score">
+            <span class="rating-score__value">
+              {{#if accountRatings.summary.scorePercent}}{{accountRatings.summary.scorePercent}}%{{else}}—{{/if}}
+            </span>
+            <span class="rating-score__label">Tỉ lệ tích cực</span>
+          </div>
+          <div class="rating-metrics">
+            <div class="rating-metric">
+              <span>👍 Tích cực</span>
+              <strong>{{accountRatings.summary.positive}}</strong>
+            </div>
+            <div class="rating-metric">
+              <span>👎 Tiêu cực</span>
+              <strong>{{accountRatings.summary.negative}}</strong>
+            </div>
+            <div class="rating-metric">
+              <span>Tổng lượt</span>
+              <strong>{{accountRatings.summary.total}}</strong>
+            </div>
+          </div>
+        </div>
+        <p class="rating-summary-note">Điểm được tính từ tất cả lượt đánh giá đã hoàn tất.</p>
+      </div>
+      {{/if}}
+
+      {{#if isBidder}}
+      {{#unless isSeller}}
+      <div class="account-card account-card--upgrade" data-upgrade-section>
+        <h3>Trở thành Người bán</h3>
+        <p class="upgrade-card-description">Nâng cấp tài khoản để đăng sản phẩm đấu giá và bắt đầu kinh doanh.</p>
+        
+        {{#if bidder.upgradeRequest}}
+          {{#if (eq bidder.upgradeRequest.status 'pending')}}
+            <div class="upgrade-status upgrade-status--pending">
+              <span class="upgrade-status__icon">⏳</span>
+              <div class="upgrade-status__content">
+                <strong>Đang chờ duyệt</strong>
+                <small>Gửi lúc {{formatDate bidder.upgradeRequest.requestDate 'DD/MM/YYYY HH:mm'}}</small>
+              </div>
+            </div>
+          {{else if (eq bidder.upgradeRequest.status 'rejected')}}
+            <div class="upgrade-status upgrade-status--rejected">
+              <span class="upgrade-status__icon">✕</span>
+              <div class="upgrade-status__content">
+                <strong>Đã bị từ chối</strong>
+                {{#if bidder.upgradeRequest.adminNote}}
+                  <small>{{bidder.upgradeRequest.adminNote}}</small>
+                {{/if}}
+              </div>
+            </div>
+            <button type="button" class="btn primary upgrade-btn" data-upgrade-request-btn>
+              Gửi lại yêu cầu
+            </button>
+          {{/if}}
+        {{else}}
+          <ul class="upgrade-benefits-mini">
+            <li>✓ Đăng sản phẩm đấu giá</li>
+            <li>✓ Quản lý đơn hàng</li>
+            <li>✓ Nhận thanh toán an toàn</li>
+          </ul>
+          <button type="button" class="btn primary upgrade-btn" data-upgrade-request-btn>
+            Yêu cầu nâng cấp
+          </button>
+        {{/if}}
+      </div>
+      {{/unless}}
+      {{/if}}
     </aside>
   </div>
 </section>

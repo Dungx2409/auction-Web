@@ -4,9 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Online Auction - PTUDW</title>
+    <link rel="stylesheet" href="/bootstrap-icons/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="/css/style.css" />
+    <!-- Quill.js WYSIWYG Editor -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
   </head>
   <body class="{{#if showCategorySidebar}}has-category-sidebar{{else}}no-category-sidebar{{/if}}">
+    <!-- Loading Spinner Overlay -->
+    <div id="page-loader" class="page-loader">
+      <div class="page-loader__spinner">
+        <div class="page-loader__ring"></div>
+        <span class="page-loader__text">Đang tải...</span>
+      </div>
+    </div>
+
     {{> header}}
 
     <div class="layout-shell{{#unless showCategorySidebar}} layout-shell--no-sidebar{{/unless}}">
@@ -21,6 +32,7 @@
 
     {{> footer}}
 
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
     <script src="/js/main.js"></script>
   </body>
 </html>

@@ -21,40 +21,6 @@ function mapDbUser(row) {
   };
 }
 
-async function getAllUsers() {
-  const db = getKnex();
-  const rows = await db('users').select(
-    'id',
-    'full_name',
-    'email',
-    'password_hash',
-    'address',
-    'date_of_birth',
-    'role',
-    'rating_pos',
-    'rating_neg',
-    'status',
-    'created_at',
-    'updated_at'
-  );
-  return rows.map(mapDbUser);
-}
-
-async function findByEmail(email) {
-  if (!email) return null;
-  const normalized = email.toLowerCase();
-  const db = getKnex();
-  const row = await db('users').whereRaw('LOWER(email) = ?', [normalized]).first();
-  return mapDbUser(row);
-}
-
-async function findById(id) {
-  if (!id) return null;
-  const db = getKnex();
-  const row = await db('users').where({ id }).first();
-  return mapDbUser(row);
-}
-
 async function createUser({ name, address, email, passwordHash, role = 'bidder' }) {
   const db = getKnex();
   const payload = {
@@ -93,9 +59,6 @@ async function updateUser(userId, updates = {}) {
 }
 
 module.exports = {
-  getAllUsers,
-  findByEmail,
-  findById,
   createUser,
   updateUser,
 };

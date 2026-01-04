@@ -1,41 +1,51 @@
 <section class="account">
   {{> account/header user=user roles=roles}}
 
-  {{> account/nav currentSection=activeSection isSeller=isSeller isAdmin=isAdmin isBidder=isBidder}}
-
-  {{> account/actions currentSection=activeSection isSeller=isSeller isAdmin=isAdmin}}
+  {{> account/nav currentSection=activeSection isSeller=isSeller isAdmin=isAdmin isBidder=isBidder hasWatchlist=hasWatchlist}}
 
   <div class="account-sections" data-account-sections data-active-section="{{activeSection}}">
-    <div id="account-panel-profile" class="account-section-panel {{#unless (eq activeSection 'profile')}}is-hidden{{/unless}}" data-account-section="profile" role="tabpanel" {{#unless (eq activeSection 'profile')}}hidden{{/unless}}>
+    <div id="account-panel-profile"
+      class="account-section-panel {{#unless (eq activeSection 'profile')}}is-hidden{{/unless}}"
+      data-account-section="profile" role="tabpanel" {{#unless (eq activeSection 'profile' )}}hidden{{/unless}}>
       {{> account/profile-section}}
     </div>
 
-    <div id="account-panel-security" class="account-section-panel {{#unless (eq activeSection 'security')}}is-hidden{{/unless}}" data-account-section="security" role="tabpanel" {{#unless (eq activeSection 'security')}}hidden{{/unless}}>
+    <div id="account-panel-security"
+      class="account-section-panel {{#unless (eq activeSection 'security')}}is-hidden{{/unless}}"
+      data-account-section="security" role="tabpanel" {{#unless (eq activeSection 'security' )}}hidden{{/unless}}>
       {{> account/security-section}}
     </div>
 
-    {{#if isBidder}}
-    <div id="account-panel-watchlist" class="account-section-panel {{#unless (eq activeSection 'watchlist')}}is-hidden{{/unless}}" data-account-section="watchlist" role="tabpanel" {{#unless (eq activeSection 'watchlist')}}hidden{{/unless}}>
-      {{> account/watchlist-section bidder=bidder}}
+    {{#if (or isBidder isSeller)}}
+    <div id="account-panel-bidding"
+      class="account-section-panel {{#unless (eq activeSection 'bidding')}}is-hidden{{/unless}}"
+      data-account-section="bidding" role="tabpanel" {{#unless (eq activeSection 'bidding' )}}hidden{{/unless}}>
+      {{> account/product-section bidder=bidder}}
     </div>
     {{/if}}
 
-    <div id="account-panel-products" class="account-section-panel {{#unless (eq activeSection 'products')}}is-hidden{{/unless}}" data-account-section="products" role="tabpanel" {{#unless (eq activeSection 'products')}}hidden{{/unless}}>
-      {{#if isSeller}}
-        {{> account/seller-dashboard seller=seller}}
-      {{else}}
-        {{> account/seller-locked}}
-      {{/if}}
-
-      {{#if isBidder}}
-        {{> account/bidder-section bidder=bidder}}
-      {{/if}}
+    {{#if hasWatchlist}}
+    <div id="account-panel-watchlist"
+      class="account-section-panel {{#unless (eq activeSection 'watchlist')}}is-hidden{{/unless}}"
+      data-account-section="watchlist" role="tabpanel" {{#unless (eq activeSection 'watchlist' )}}hidden{{/unless}}>
+      {{> account/watchlist-section bidder=bidder seller=seller}}
     </div>
+    {{/if}}
+
+    {{#if isSeller}}
+    <div id="account-panel-products"
+      class="account-section-panel {{#unless (eq activeSection 'products')}}is-hidden{{/unless}}"
+      data-account-section="products" role="tabpanel" {{#unless (eq activeSection 'products' )}}hidden{{/unless}}>
+      {{> account/seller-dashboard seller=seller}}
+    </div>
+    {{/if}}
 
     {{#if isAdmin}}
-      <div id="account-panel-admin" class="account-section-panel {{#unless (eq activeSection 'admin')}}is-hidden{{/unless}}" data-account-section="admin" role="tabpanel" {{#unless (eq activeSection 'admin')}}hidden{{/unless}}>
-        {{> account/admin-section admin=admin}}
-      </div>
+    <div id="account-panel-admin"
+      class="account-section-panel {{#unless (eq activeSection 'admin')}}is-hidden{{/unless}}"
+      data-account-section="admin" role="tabpanel" {{#unless (eq activeSection 'admin' )}}hidden{{/unless}}>
+      {{> account/admin-section admin=admin}}
+    </div>
     {{/if}}
   </div>
 </section>

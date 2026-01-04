@@ -1,0 +1,74 @@
+<section class="page-heading">
+  <h1>Đánh giá của {{profileUser.name}}</h1>
+  <p>
+    {{#if profileUser.isSeller}}
+      <span class="badge badge--seller">Người bán</span>
+    {{/if}}
+    {{#if profileUser.isBidder}}
+      <span class="badge badge--bidder">Người mua</span>
+    {{/if}}
+  </p>
+</section>
+
+<div class="user-ratings-page">
+  <div class="rating-summary-card">
+    <h2>Tổng quan đánh giá</h2>
+    <div class="rating-stats">
+      <div class="rating-stat">
+        <span class="rating-number positive">{{profileUser.ratingPlus}}</span>
+        <span class="rating-label">👍 Tích cực</span>
+      </div>
+      <div class="rating-stat">
+        <span class="rating-number negative">{{profileUser.ratingMinus}}</span>
+        <span class="rating-label">👎 Tiêu cực</span>
+      </div>
+      <div class="rating-stat">
+        <span class="rating-number total">{{profileUser.ratingTotal}}</span>
+        <span class="rating-label">Tổng số</span>
+      </div>
+      {{#if profileUser.ratingPercent}}
+      <div class="rating-stat">
+        <span class="rating-number percent">{{profileUser.ratingPercent}}%</span>
+        <span class="rating-label">Tỷ lệ tích cực</span>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+
+  <section class="ratings-list">
+    <h2>Lịch sử đánh giá</h2>
+    {{#if hasRatings}}
+      <div class="rating-items">
+        {{#each ratings}}
+          <div class="rating-item {{#if (eq score 1)}}rating-positive{{else}}rating-negative{{/if}}">
+            <div class="rating-icon">
+              {{#if (eq score 1)}}👍{{else}}👎{{/if}}
+            </div>
+            <div class="rating-content">
+              <div class="rating-header">
+                <span class="rating-from">
+                  Từ: <strong>{{fromUser.name}}</strong>
+                </span>
+                <span class="rating-date">{{formatDate createdAt}}</span>
+              </div>
+              {{#if comment}}
+                <p class="rating-comment">"{{comment}}"</p>
+              {{else}}
+                <p class="rating-comment rating-no-comment">Không có nhận xét</p>
+              {{/if}}
+              {{#if product}}
+                <a href="/products/{{product.id}}" class="rating-product-link">
+                  📦 {{product.title}}
+                </a>
+              {{/if}}
+            </div>
+          </div>
+        {{/each}}
+      </div>
+    {{else}}
+      <div class="empty-state">
+        <p>Chưa có đánh giá nào.</p>
+      </div>
+    {{/if}}
+  </section>
+</div>

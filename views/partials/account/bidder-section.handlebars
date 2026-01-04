@@ -24,6 +24,57 @@
   {{/if}}
 </section>
 
+{{#unless isSeller}}
+<section class="account-section upgrade-request-section" data-upgrade-section>
+  <h2>Nâng cấp lên Người bán</h2>
+  <div class="upgrade-request-card">
+    <div class="upgrade-request-info">
+      <p class="upgrade-description">
+        Trở thành người bán để đăng sản phẩm đấu giá và tiếp cận hàng nghìn người mua tiềm năng.
+      </p>
+      <ul class="upgrade-benefits">
+        <li>✓ Đăng sản phẩm đấu giá không giới hạn</li>
+        <li>✓ Quản lý đơn hàng và giao dịch</li>
+        <li>✓ Nhận thanh toán an toàn từ người mua</li>
+        <li>✓ Theo dõi thống kê bán hàng chi tiết</li>
+      </ul>
+    </div>
+
+    {{#if bidder.upgradeRequest}}
+      {{#if (eq bidder.upgradeRequest.status 'pending')}}
+        <div class="upgrade-request-status upgrade-request-status--pending">
+          <span class="status-icon">⏳</span>
+          <div class="status-content">
+            <strong>Yêu cầu đang chờ duyệt</strong>
+            <p>Yêu cầu nâng cấp của bạn đã được gửi và đang chờ admin xét duyệt.</p>
+            <small>Gửi lúc: {{formatDate bidder.upgradeRequest.requestDate 'DD/MM/YYYY HH:mm'}}</small>
+          </div>
+        </div>
+      {{else if (eq bidder.upgradeRequest.status 'rejected')}}
+        <div class="upgrade-request-status upgrade-request-status--rejected">
+          <span class="status-icon">✕</span>
+          <div class="status-content">
+            <strong>Yêu cầu đã bị từ chối</strong>
+            {{#if bidder.upgradeRequest.adminNote}}
+              <p>Lý do: {{bidder.upgradeRequest.adminNote}}</p>
+            {{else}}
+              <p>Yêu cầu của bạn chưa được chấp nhận. Bạn có thể gửi lại yêu cầu.</p>
+            {{/if}}
+          </div>
+        </div>
+        <button type="button" class="btn primary upgrade-request-btn" data-upgrade-request-btn>
+          Gửi lại yêu cầu nâng cấp
+        </button>
+      {{/if}}
+    {{else}}
+      <button type="button" class="btn primary upgrade-request-btn" data-upgrade-request-btn>
+        Yêu cầu nâng cấp lên Người bán
+      </button>
+    {{/if}}
+  </div>
+</section>
+{{/unless}}
+
 <section class="account-section">
   <h2>Gợi ý dành riêng cho bạn</h2>
   <div class="product-grid">

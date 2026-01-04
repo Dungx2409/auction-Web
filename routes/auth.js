@@ -5,6 +5,7 @@ const dataService = require('../services/dataService');
 const userStore = require('../services/userStore');
 const { verifyRecaptcha } = require('../services/recaptcha');
 const pendingRegistrations = require('../services/pendingRegistrations');
+const mailer = require('../services/mailer');
 
 const router = express.Router();
 
@@ -89,7 +90,7 @@ router.post('/login', async (req, res) => {
   }
   
   res.cookie('userId', user.id, cookieOptions);
-  res.redirect(returnUrl || '/account');
+  res.redirect(returnUrl || '/');
 });
 
 router.get('/register', (req, res) => {
@@ -181,15 +182,46 @@ router.post('/register', async (req, res) => {
 
   console.info(`OTP cho ${trimmedEmail}: ${pending.otp} (hết hạn sau 10 phút)`);
 
+  let flash = {
+    type: 'success',
+    message: 'Chúng tôi đã gửi mã OTP tới email của bạn. Vui lòng nhập để hoàn tất đăng ký.',
+  };
+
+  try {
+    const mailResult = await mailer.sendOtpEmail({
+      to: trimmedEmail,
+      name: trimmedName,
+      otp: pending.otp,
+      expiresAt: pending.expiresAt,
+    });
+
+    if (mailResult?.skipped) {
+      flash = {
+        type: 'warning',
+        message: 'Hệ thống chưa cấu hình SMTP nên OTP không thể gửi qua email. Liên hệ quản trị viên để được hỗ trợ.',
+      };
+    }
+  } catch (error) {
+    console.error('Không thể gửi email OTP:', error);
+    return res.status(500).render('login/register', {
+      title: 'Đăng ký tài khoản',
+      form: {
+        name: trimmedName,
+        email: trimmedEmail,
+        address: trimmedAddress,
+      },
+      errors: {
+        global: 'Không thể gửi email OTP. Vui lòng thử lại sau.',
+      },
+    });
+  }
+
   res.render('login/verify-otp', {
     title: 'Xác minh OTP',
     registrationId: pending.id,
     email: trimmedEmail,
     expiresAt: pending.expiresAt,
-    flash: {
-      type: 'success',
-      message: 'Chúng tôi đã gửi mã OTP tới email của bạn. Vui lòng nhập để hoàn tất đăng ký.',
-    },
+    flash,
   });
 });
 

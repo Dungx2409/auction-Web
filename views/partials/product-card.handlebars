@@ -1,43 +1,22 @@
-<article class="product-card">
-  <a class="product-link" href="/products/{{id}}">
-    <figure class="product-thumb">
+<article class="product-card{{#if isNew}} product-card--new{{/if}}">
+  <div class="product-card__media">
+    <a class="product-card__media-link" href="/products/{{id}}">
       <img src="{{images.[0]}}" alt="{{title}}" loading="lazy" />
-      {{#if autoExtend}}
-        <span class="badge badge-auto">Gia hạn tự động</span>
-      {{/if}}
-    </figure>
-    <div class="product-body">
-      <h3>{{title}}</h3>
-      <p class="product-summary">{{summary}}</p>
-      <dl class="product-meta">
-        <div>
-          <dt>Giá hiện tại</dt>
-          <dd>{{formatCurrency currentPrice}}</dd>
-        </div>
-        <div>
-          <dt>Bước giá</dt>
-          <dd>{{formatCurrency bidStep}}</dd>
-        </div>
-        <div>
-          <dt>Kết thúc</dt>
-          <dd>{{relativeTime endDate}}</dd>
-        </div>
-      </dl>
+    </a>
+    {{#if isNew}}
+    <div class="product-card__new-badge">
+      <span class="product-card__new-icon">🔥</span>
+      <span>Mới đăng</span>
     </div>
-  </a>
-  <footer class="product-footer">
-    <div>
-      <span class="label">Lượt ra giá:</span>
-      <span>{{bidCount}}</span>
+    {{/if}}
+    <div class="product-card__timer">
+      <span class="product-card__timer-dot"></span>
+      <span>{{countdown endDate}}</span>
     </div>
-    <div>
-      <span class="label">Đang thắng:</span>
-      <span>{{maskName highestBidder.name}}</span>
-    </div>
-    <div class="product-watch">
+    <div class="product-card__watch">
       <button
         type="button"
-        class="watchlist-button{{#if isWatching}} is-watching{{/if}}"
+        class="watchlist-button watchlist-button--glass{{#if isWatching}} is-watching{{/if}}"
         data-product-id="{{id}}"
         data-watch-state="{{#if isWatching}}watching{{else}}idle{{/if}}"
         aria-pressed="{{#if isWatching}}true{{else}}false{{/if}}"
@@ -48,8 +27,67 @@
             <path d="M12 21.35l-1.45-1.32C6 15.36 3 12.28 3 8.5 3 6 5 4 7.5 4c1.74 0 3.41 1 4.5 2.44C13.59 5 15.26 4 17 4c2.5 0 4.5 2 4.5 4.5 0 3.78-3 6.86-7.55 11.54L12 21.35z" />
           </svg>
         </span>
-        <span class="watch-count">{{#if watchers}}{{watchers}}{{else}}0{{/if}}</span>
+        <span class="watch-count">
+          {{#if watchers}}{{watchers}} theo dõi{{else}}Thêm vào theo dõi{{/if}}
+        </span>
       </button>
     </div>
-  </footer>
+    {{#if autoExtend}}
+      <span class="badge badge-auto">Gia hạn tự động</span>
+    {{/if}}
+  </div>
+
+  <div class="product-card__body">
+    <h3 class="product-card__title">
+      <a href="/products/{{id}}">{{title}}</a>
+    </h3>
+    <div class="product-card__price">
+      <span>Giá hiện tại</span>
+      <strong>{{formatCurrency currentPrice}}</strong>
+    </div>
+
+    <div class="product-card__bidder">
+      <div class="product-card__bidder-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+          <path d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-3.314 0-6 2.239-6 5v1h12v-1c0-2.761-2.686-5-6-5z" />
+        </svg>
+      </div>
+      <div>
+        <p>Người đặt giá cao nhất</p>
+        <strong>
+          {{#if bidCount}}
+            {{maskName highestBidder.name}}
+          {{else}}
+            Chưa có
+          {{/if}}
+        </strong>
+      </div>
+    </div>
+
+    <div class="product-card__stats">
+      <div>
+        <span>Ngày đăng</span>
+        <strong>{{formatDate startDate 'DD/MM/YYYY'}}</strong>
+      </div>
+      <div>
+        <span>Lượt đặt giá</span>
+        <strong>{{bidCount}}</strong>
+      </div>
+      <div>
+        <span>Mua ngay</span>
+        <strong>{{#if buyNowPrice}}{{formatCurrency buyNowPrice}}{{else}}—{{/if}}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="product-card__actions">
+    <a class="product-card__action product-card__action--bid" href="/products/{{id}}">Đặt giá</a>
+    <a
+      class="product-card__action product-card__action--buy{{#unless buyNowPrice}} is-disabled{{/unless}}"
+      href="/products/{{id}}?buy=now"
+      {{#unless buyNowPrice}}aria-disabled="true" tabindex="-1"{{/unless}}
+    >
+      Mua ngay
+    </a>
+  </div>
 </article>

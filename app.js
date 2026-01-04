@@ -15,6 +15,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/bootstrap-icons', express.static(path.join(__dirname, 'node_modules/bootstrap-icons/font')));
 
 // View engine configuration
 app.engine(
@@ -75,12 +77,14 @@ const productsRouter = require('./routes/products');
 const accountRouter = require('./routes/account');
 const authRouter = require('./routes/auth');
 const ordersRouter = require('./routes/orders');
+const usersRouter = require('./routes/users');
 
 app.use('/', indexRouter);
 app.use('/products', productsRouter);
 app.use('/account', accountRouter);
 app.use('/auth', authRouter);
 app.use('/orders', ordersRouter);
+app.use('/users', usersRouter);
 
 // Fallback 404
 app.use((req, res) => {
