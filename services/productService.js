@@ -655,6 +655,7 @@ async function getProductById(id, { includeBannedSeller = false } = {}) {
 		.leftJoin('users as u', 'u.id', 'b.bidder_id')
 		.where('b.product_id', id)
 		.orderBy('b.created_at', 'desc')
+		.orderBy('b.id', 'desc')
 		.select('b.id', 'b.bidder_id', 'b.bid_price', 'b.created_at', 'u.full_name', 'u.rating_pos', 'u.rating_neg');
 
 	product.bids = bids.map((bid) => ({

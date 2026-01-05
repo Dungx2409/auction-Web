@@ -286,6 +286,7 @@ async function ensureOrderForProduct(product, { chatLimit } = {}) {
 	const db = getKnex();
 	return db.transaction(async (trx) => {
 		let orderRow = await getOrderRowByProduct(product.id, trx);
+		let isNewOrder = false;
 		if (!orderRow) {
 			const totalPrice = Number(product.currentPrice || product.startPrice || 0);
 			const [inserted] = await trx('orders')
@@ -300,8 +301,12 @@ async function ensureOrderForProduct(product, { chatLimit } = {}) {
 				})
 				.returning('*');
 			orderRow = inserted;
+			isNewOrder = true;
 		}
-		return getOrderContextByRow(orderRow, { chatLimit, trx });
+		const orderContext = await getOrderContextByRow(orderRow, { chatLimit, trx });
+		// Include isNewOrder flag to indicate if order was just created
+		// This is useful for sending auction end notifications
+		return { ...orderContext, isNewOrder };
 	});
 }
 

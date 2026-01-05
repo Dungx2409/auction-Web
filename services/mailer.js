@@ -418,6 +418,252 @@ async function sendPasswordResetEmail({ to, userName, newPassword }) {
   return { success: true };
 }
 
+// ========== AUCTION ENDING SOON NOTIFICATION ==========
+
+function buildAuctionEndingSoonEmail({ bidderName, productTitle, productUrl, endTime, currentPrice, yourBidAmount, isWinning }) {
+  const safeBidder = escapeHtml(bidderName || 'bạn');
+  const safeProduct = escapeHtml(productTitle || 'sản phẩm');
+  const link = productUrl || '#';
+  const statusText = isWinning ? '🏆 Bạn đang dẫn đầu!' : '⚠️ Bạn đã bị vượt giá!';
+  const statusColor = isWinning ? '#22c55e' : '#ef4444';
+  const actionText = isWinning ? 'Theo dõi để đảm bảo chiến thắng' : 'Đặt giá ngay để giành lại vị trí!';
+
+  return {
+    subject: `Sắp kết thúc: ${productTitle}`,
+    text: `Xin chào ${safeBidder},\n\nPhiên đấu giá "${productTitle}" sắp kết thúc vào ${endTime}.\n\n${isWinning ? 'Bạn đang dẫn đầu với giá ' + yourBidAmount : 'Bạn đã bị vượt giá. Giá hiện tại: ' + currentPrice}\n\n${actionText}\n\nXem sản phẩm: ${link}\n\nTrân trọng,\nĐội ngũ Auction Web`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">⏰ Phiên đấu giá sắp kết thúc!</h2>
+        <p>Xin chào <strong>${safeBidder}</strong>,</p>
+        <p>Phiên đấu giá <em>${safeProduct}</em> sắp kết thúc vào <strong>${escapeHtml(endTime)}</strong>.</p>
+        <div style="background: #f8f9fa; border-left: 4px solid ${statusColor}; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0; font-size: 16px; color: ${statusColor}; font-weight: bold;">${statusText}</p>
+          <p style="margin: 8px 0 0 0;">Giá hiện tại: <strong>${escapeHtml(currentPrice)}</strong></p>
+          ${!isWinning ? `<p style="margin: 4px 0 0 0;">Giá của bạn: ${escapeHtml(yourBidAmount)}</p>` : ''}
+        </div>
+        <p>${actionText}</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;border-radius:999px;background:${isWinning ? '#22c55e' : '#ef4444'};color:#fff;text-decoration:none;font-weight:bold;">
+            ${isWinning ? 'Theo dõi phiên đấu giá' : 'Đặt giá ngay'}
+          </a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e6ef; margin: 24px 0;">
+        <p style="color: #666; font-size: 13px;">Trân trọng,<br/><strong>Đội ngũ Auction Web</strong></p>
+      </div>
+    `,
+  };
+}
+
+async function sendAuctionEndingSoonEmail({ to, bidderName, productTitle, productUrl, endTime, currentPrice, yourBidAmount, isWinning }) {
+  if (!to) return { success: false, skipped: true };
+
+  if (!isMailerConfigured()) {
+    console.info('[mailer] SMTP chưa cấu hình, bỏ qua gửi email sắp kết thúc cho %s.', to);
+    return { success: false, skipped: true };
+  }
+
+  const emailContent = buildAuctionEndingSoonEmail({ bidderName, productTitle, productUrl, endTime, currentPrice, yourBidAmount, isWinning });
+  const mailTransport = getTransporter();
+
+  await mailTransport.sendMail({
+    from: `${config.mailer.fromName} <${config.mailer.fromAddress}>`,
+    to,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+
+  return { success: true };
+}
+
+// ========== AUCTION WON NOTIFICATION ==========
+
+function buildAuctionWonEmail({ winnerName, productTitle, productUrl, finalPrice, sellerName }) {
+  const safeWinner = escapeHtml(winnerName || 'bạn');
+  const safeProduct = escapeHtml(productTitle || 'sản phẩm');
+  const safeSeller = escapeHtml(sellerName || 'Người bán');
+  const link = productUrl || '#';
+
+  return {
+    subject: `🎉 Chúc mừng! Bạn đã thắng đấu giá: ${productTitle}`,
+    text: `Xin chào ${safeWinner},\n\nChúc mừng! Bạn đã thắng phiên đấu giá "${productTitle}" với giá ${finalPrice}.\n\nVui lòng liên hệ người bán ${safeSeller} để hoàn tất giao dịch.\n\nXem chi tiết: ${link}\n\nTrân trọng,\nĐội ngũ Auction Web`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #22c55e;">🎉 Chúc mừng! Bạn đã thắng!</h2>
+        <p>Xin chào <strong>${safeWinner}</strong>,</p>
+        <p>Bạn đã thắng phiên đấu giá <em>${safeProduct}</em>!</p>
+        <div style="background: #ecfdf5; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0; font-size: 18px; font-weight: bold; color: #22c55e;">Giá chiến thắng: ${escapeHtml(finalPrice)}</p>
+          <p style="margin: 8px 0 0 0;">Người bán: <strong>${safeSeller}</strong></p>
+        </div>
+        <p>Vui lòng truy cập trang đơn hàng để hoàn tất thanh toán và nhận hàng.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;border-radius:999px;background:#22c55e;color:#fff;text-decoration:none;font-weight:bold;">
+            Xem đơn hàng
+          </a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e6ef; margin: 24px 0;">
+        <p style="color: #666; font-size: 13px;">Trân trọng,<br/><strong>Đội ngũ Auction Web</strong></p>
+      </div>
+    `,
+  };
+}
+
+async function sendAuctionWonEmail({ to, winnerName, productTitle, productUrl, finalPrice, sellerName }) {
+  if (!to) return { success: false, skipped: true };
+
+  if (!isMailerConfigured()) {
+    console.info('[mailer] SMTP chưa cấu hình, bỏ qua gửi email thắng đấu giá cho %s.', to);
+    return { success: false, skipped: true };
+  }
+
+  const emailContent = buildAuctionWonEmail({ winnerName, productTitle, productUrl, finalPrice, sellerName });
+  const mailTransport = getTransporter();
+
+  await mailTransport.sendMail({
+    from: `${config.mailer.fromName} <${config.mailer.fromAddress}>`,
+    to,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+
+  return { success: true };
+}
+
+// ========== AUCTION LOST NOTIFICATION ==========
+
+function buildAuctionLostEmail({ bidderName, productTitle, productUrl, finalPrice, yourBidAmount }) {
+  const safeBidder = escapeHtml(bidderName || 'bạn');
+  const safeProduct = escapeHtml(productTitle || 'sản phẩm');
+  const link = productUrl || '#';
+
+  return {
+    subject: `Phiên đấu giá đã kết thúc: ${productTitle}`,
+    text: `Xin chào ${safeBidder},\n\nPhiên đấu giá "${productTitle}" đã kết thúc.\n\nRất tiếc, bạn không phải người thắng cuộc. Giá chiến thắng là ${finalPrice}, cao hơn giá tối đa ${yourBidAmount} của bạn.\n\nHãy tham gia các phiên đấu giá khác!\n\nXem sản phẩm khác: ${link}\n\nTrân trọng,\nĐội ngũ Auction Web`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6b7280;">Phiên đấu giá đã kết thúc</h2>
+        <p>Xin chào <strong>${safeBidder}</strong>,</p>
+        <p>Phiên đấu giá <em>${safeProduct}</em> đã kết thúc.</p>
+        <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0; color: #ef4444;">Rất tiếc, bạn không phải người thắng cuộc.</p>
+          <p style="margin: 8px 0 0 0;">Giá chiến thắng: <strong>${escapeHtml(finalPrice)}</strong></p>
+          <p style="margin: 4px 0 0 0;">Giá tối đa của bạn: ${escapeHtml(yourBidAmount)}</p>
+        </div>
+        <p>Đừng nản lòng! Hãy khám phá các sản phẩm khác đang được đấu giá.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;border-radius:999px;background:#0f62fe;color:#fff;text-decoration:none;font-weight:bold;">
+            Xem sản phẩm khác
+          </a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e6ef; margin: 24px 0;">
+        <p style="color: #666; font-size: 13px;">Trân trọng,<br/><strong>Đội ngũ Auction Web</strong></p>
+      </div>
+    `,
+  };
+}
+
+async function sendAuctionLostEmail({ to, bidderName, productTitle, productUrl, finalPrice, yourBidAmount }) {
+  if (!to) return { success: false, skipped: true };
+
+  if (!isMailerConfigured()) {
+    console.info('[mailer] SMTP chưa cấu hình, bỏ qua gửi email thua đấu giá cho %s.', to);
+    return { success: false, skipped: true };
+  }
+
+  const emailContent = buildAuctionLostEmail({ bidderName, productTitle, productUrl, finalPrice, yourBidAmount });
+  const mailTransport = getTransporter();
+
+  await mailTransport.sendMail({
+    from: `${config.mailer.fromName} <${config.mailer.fromAddress}>`,
+    to,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+
+  return { success: true };
+}
+
+// ========== AUCTION ENDED NOTIFICATION FOR SELLER ==========
+
+function buildAuctionEndedForSellerEmail({ sellerName, productTitle, productUrl, finalPrice, winnerName, bidCount }) {
+  const safeSeller = escapeHtml(sellerName || 'bạn');
+  const safeProduct = escapeHtml(productTitle || 'sản phẩm');
+  const safeWinner = escapeHtml(winnerName || 'Người thắng');
+  const link = productUrl || '#';
+  const hasWinner = bidCount > 0;
+
+  return {
+    subject: hasWinner ? `🎉 Phiên đấu giá kết thúc thành công: ${productTitle}` : `Phiên đấu giá đã kết thúc: ${productTitle}`,
+    text: hasWinner 
+      ? `Xin chào ${safeSeller},\n\nPhiên đấu giá "${productTitle}" đã kết thúc thành công!\n\nGiá bán: ${finalPrice}\nNgười thắng: ${safeWinner}\nTổng số lượt đặt giá: ${bidCount}\n\nVui lòng liên hệ người mua để hoàn tất giao dịch.\n\nXem chi tiết: ${link}\n\nTrân trọng,\nĐội ngũ Auction Web`
+      : `Xin chào ${safeSeller},\n\nPhiên đấu giá "${productTitle}" đã kết thúc nhưng không có ai đặt giá.\n\nBạn có thể đăng lại sản phẩm hoặc điều chỉnh giá khởi điểm.\n\nXem chi tiết: ${link}\n\nTrân trọng,\nĐội ngũ Auction Web`,
+    html: hasWinner ? `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #22c55e;">🎉 Phiên đấu giá kết thúc thành công!</h2>
+        <p>Xin chào <strong>${safeSeller}</strong>,</p>
+        <p>Phiên đấu giá <em>${safeProduct}</em> đã kết thúc thành công!</p>
+        <div style="background: #ecfdf5; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0; font-size: 18px; font-weight: bold; color: #22c55e;">Giá bán: ${escapeHtml(finalPrice)}</p>
+          <p style="margin: 8px 0 0 0;">Người thắng: <strong>${safeWinner}</strong></p>
+          <p style="margin: 4px 0 0 0;">Tổng số lượt đặt giá: ${bidCount}</p>
+        </div>
+        <p>Vui lòng truy cập trang đơn hàng để xử lý giao dịch.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;border-radius:999px;background:#22c55e;color:#fff;text-decoration:none;font-weight:bold;">
+            Xem đơn hàng
+          </a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e6ef; margin: 24px 0;">
+        <p style="color: #666; font-size: 13px;">Trân trọng,<br/><strong>Đội ngũ Auction Web</strong></p>
+      </div>
+    ` : `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6b7280;">Phiên đấu giá đã kết thúc</h2>
+        <p>Xin chào <strong>${safeSeller}</strong>,</p>
+        <p>Phiên đấu giá <em>${safeProduct}</em> đã kết thúc nhưng <strong>không có ai đặt giá</strong>.</p>
+        <p>Bạn có thể:</p>
+        <ul>
+          <li>Đăng lại sản phẩm với giá khởi điểm thấp hơn</li>
+          <li>Cập nhật mô tả và hình ảnh sản phẩm</li>
+          <li>Gia hạn thời gian đấu giá</li>
+        </ul>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;border-radius:999px;background:#0f62fe;color:#fff;text-decoration:none;font-weight:bold;">
+            Quản lý sản phẩm
+          </a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e6ef; margin: 24px 0;">
+        <p style="color: #666; font-size: 13px;">Trân trọng,<br/><strong>Đội ngũ Auction Web</strong></p>
+      </div>
+    `,
+  };
+}
+
+async function sendAuctionEndedForSellerEmail({ to, sellerName, productTitle, productUrl, finalPrice, winnerName, bidCount }) {
+  if (!to) return { success: false, skipped: true };
+
+  if (!isMailerConfigured()) {
+    console.info('[mailer] SMTP chưa cấu hình, bỏ qua gửi email kết thúc đấu giá cho seller %s.', to);
+    return { success: false, skipped: true };
+  }
+
+  const emailContent = buildAuctionEndedForSellerEmail({ sellerName, productTitle, productUrl, finalPrice, winnerName, bidCount });
+  const mailTransport = getTransporter();
+
+  await mailTransport.sendMail({
+    from: `${config.mailer.fromName} <${config.mailer.fromAddress}>`,
+    to,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+
+  return { success: true };
+}
+
 module.exports = {
   isMailerConfigured,
   sendOtpEmail,
@@ -428,4 +674,9 @@ module.exports = {
   sendBidNotificationToSeller,
   sendOutbidNotificationEmail,
   sendPasswordResetEmail,
+  // Auction lifecycle emails
+  sendAuctionEndingSoonEmail,
+  sendAuctionWonEmail,
+  sendAuctionLostEmail,
+  sendAuctionEndedForSellerEmail,
 };

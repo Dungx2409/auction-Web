@@ -567,8 +567,9 @@ async function removeAutoBid(productId, bidderId) {
 
 /**
  * Process auto-bids after a new bid is placed
- * This is the core logic for automatic bidding
- * Returns immediately after placing ONE auto-bid response
+ * This is the core logic for automatic bidding (proxy bidding)
+ * Simulates step-by-step bidding between auto-bidders and records full history
+ * Returns detailed info for email notifications
  */
 async function processAutoBids({ productId, currentBidAmount, currentBidderId }) {
 	const db = getKnex();
@@ -585,122 +586,160 @@ async function processAutoBids({ productId, currentBidAmount, currentBidderId })
 	}
 
 	const bidStep = Number(product.step_price || 0);
-	const currentPrice = Number(currentBidAmount);
 
-	// Get all active auto-bids for this product that can still compete
-	// (max_price > current price + bid step, meaning they can outbid)
-	const allAutoBids = await db('auto_bids')
-		.where('product_id', productId)
-		.where('max_price', '>=', currentPrice + bidStep)
-		.orderBy('max_price', 'desc')
-		.orderBy('created_at', 'asc');
-
-	if (!allAutoBids.length) {
-		return { processed: false, reason: 'NO_VALID_AUTO_BIDS' };
-	}
-
-	// Find auto-bids excluding current bidder
-	const competingAutoBids = allAutoBids.filter(
-		ab => String(ab.bidder_id) !== String(currentBidderId)
-	);
-
-	if (!competingAutoBids.length) {
-		// Current bidder is the only one with auto-bid, no action needed
-		return { processed: false, reason: 'NO_COMPETING_AUTO_BIDS' };
-	}
-
-	// The highest competing auto-bid
-	const highestCompeting = competingAutoBids[0];
-	const highestMaxPrice = Number(highestCompeting.max_price);
-	const highestBidderId = highestCompeting.bidder_id;
-
-	// Check if current bidder also has auto-bid
-	const currentBidderAutoBid = allAutoBids.find(
-		ab => String(ab.bidder_id) === String(currentBidderId)
-	);
-	const currentBidderMaxPrice = currentBidderAutoBid 
-		? Number(currentBidderAutoBid.max_price) 
-		: currentPrice;
-
-	// If current bidder's max price is higher or equal, no auto-bid needed
-	// (current bidder is already winning or will continue to win)
-	if (currentBidderMaxPrice >= highestMaxPrice) {
-		// But if they're equal, the one who set auto-bid first wins
-		if (currentBidderMaxPrice === highestMaxPrice) {
-			// Check who set it first
-			const currentCreatedAt = currentBidderAutoBid?.created_at;
-			const competingCreatedAt = highestCompeting.created_at;
-			if (currentCreatedAt && new Date(currentCreatedAt) <= new Date(competingCreatedAt)) {
-				return { processed: false, reason: 'CURRENT_BIDDER_HAS_PRIORITY' };
-			}
-		} else {
-			return { processed: false, reason: 'CURRENT_BIDDER_MAX_HIGHER' };
-		}
-	}
-
-	// Calculate the auto-bid amount
-	// Bid just enough to beat the current price, but not more than max
-	let autoBidAmount = currentPrice + bidStep;
-
-	// If current bidder has auto-bid, we need to beat their max
-	if (currentBidderMaxPrice > currentPrice) {
-		autoBidAmount = Math.min(currentBidderMaxPrice + bidStep, highestMaxPrice);
-	}
-
-	// Make sure we don't exceed our max
-	if (autoBidAmount > highestMaxPrice) {
-		autoBidAmount = highestMaxPrice;
-	}
-
-	// Make sure it's higher than current price
-	if (autoBidAmount <= currentPrice) {
-		return { processed: false, reason: 'CANNOT_OUTBID' };
-	}
-
-	// Place the automatic bid
+	// Use transaction to ensure consistency
 	return db.transaction(async (trx) => {
-		// Re-fetch product with lock
+		// Lock product for update
 		const latestProduct = await trx('products').where({ id: productId }).forUpdate().first();
-		const latestPrice = Number(latestProduct.current_price || latestProduct.start_price);
+		let runningPrice = Number(currentBidAmount);
+		let runningBidCount = Number(latestProduct.bid_count || 0);
+		let lastBidderId = currentBidderId;
 
-		// Re-check if our auto-bid is still valid
-		if (autoBidAmount <= latestPrice) {
-			return { processed: false, reason: 'PRICE_ALREADY_HIGHER' };
+		// Get all active auto-bids for this product with user info
+		const allAutoBids = await trx('auto_bids as ab')
+			.leftJoin('users as u', 'u.id', 'ab.bidder_id')
+			.where('ab.product_id', productId)
+			.select(
+				'ab.bidder_id',
+				'ab.max_price',
+				'ab.created_at',
+				'u.full_name as bidder_name',
+				'u.email as bidder_email'
+			)
+			.orderBy('ab.max_price', 'desc')
+			.orderBy('ab.created_at', 'asc');
+
+		if (allAutoBids.length === 0) {
+			return { processed: false, reason: 'NO_AUTO_BIDS' };
 		}
 
-		// Re-check max price is still sufficient
-		if (autoBidAmount > highestMaxPrice) {
-			return { processed: false, reason: 'AUTO_BID_MAX_EXCEEDED' };
+		// Build a map of bidder -> info (including email for notifications)
+		const autoBidMap = new Map();
+		for (const ab of allAutoBids) {
+			autoBidMap.set(String(ab.bidder_id), {
+				bidderId: ab.bidder_id,
+				maxPrice: Number(ab.max_price),
+				createdAt: ab.created_at,
+				name: ab.bidder_name,
+				email: ab.bidder_email,
+			});
 		}
 
-		const nextBidCount = Number(latestProduct.bid_count || 0) + 1;
+		// Track all bids placed during this process
+		const bidsPlaced = [];
+		// Track outbid events for email notifications
+		const outbidEvents = [];
+		
+		// Maximum iterations to prevent infinite loops
+		const maxIterations = 1000;
+		let iterations = 0;
 
-		// Insert auto bid with is_auto flag
-		await trx('bids').insert({
-			product_id: productId,
-			bidder_id: highestBidderId,
-			bid_price: autoBidAmount,
-			is_auto: true,
-			created_at: trx.fn.now(),
-		});
+		// Simulate proxy bidding - step by step
+		while (iterations < maxIterations) {
+			iterations++;
 
-		// Update product price
-		await trx('products')
-			.where({ id: productId })
-			.update({
-				current_price: autoBidAmount,
-				bid_count: nextBidCount,
-				updated_at: trx.fn.now(),
+			// Find all bidders who can still compete (max_price >= runningPrice + bidStep)
+			// and are not the current leader
+			const competitors = [];
+			for (const [bidderId, info] of autoBidMap.entries()) {
+				if (bidderId !== String(lastBidderId) && info.maxPrice >= runningPrice + bidStep) {
+					competitors.push(info);
+				}
+			}
+
+			if (competitors.length === 0) {
+				// No one can outbid, current leader wins
+				break;
+			}
+
+			// Sort competitors: highest max_price first, then earliest created_at
+			competitors.sort((a, b) => {
+				if (b.maxPrice !== a.maxPrice) {
+					return b.maxPrice - a.maxPrice;
+				}
+				return new Date(a.createdAt) - new Date(b.createdAt);
 			});
 
-		return {
-			processed: true,
-			autoBid: {
-				bidderId: highestBidderId,
-				amount: autoBidAmount,
-				bidCount: nextBidCount,
-			},
-		};
+			// The best competitor places the next bid
+			const bestCompetitor = competitors[0];
+			
+			// Calculate next bid amount - always just one step above current price
+			const nextBidAmount = runningPrice + bidStep;
+
+			// Make sure competitor can afford this bid
+			if (nextBidAmount > bestCompetitor.maxPrice) {
+				// Can't afford to outbid, stop here
+				break;
+			}
+
+			// Record the outbid event for the previous leader
+			const previousLeaderInfo = autoBidMap.get(String(lastBidderId));
+			if (previousLeaderInfo && previousLeaderInfo.email) {
+				outbidEvents.push({
+					bidderId: lastBidderId,
+					bidderName: previousLeaderInfo.name,
+					bidderEmail: previousLeaderInfo.email,
+					previousAmount: runningPrice,
+					newAmount: nextBidAmount,
+					outbidBy: bestCompetitor.bidderId,
+				});
+			}
+
+			// Place the bid
+			runningBidCount++;
+			await trx('bids').insert({
+				product_id: productId,
+				bidder_id: bestCompetitor.bidderId,
+				bid_price: nextBidAmount,
+				is_auto: true,
+				created_at: trx.fn.now(),
+			});
+
+			bidsPlaced.push({
+				bidderId: bestCompetitor.bidderId,
+				bidderName: bestCompetitor.name,
+				bidderEmail: bestCompetitor.email,
+				amount: nextBidAmount,
+			});
+
+			runningPrice = nextBidAmount;
+			lastBidderId = bestCompetitor.bidderId;
+
+			// The loop continues - previous leader becomes a "competitor" in next iteration
+			// if they have auto-bid and can still afford to counter
+		}
+
+		// Update product with final price and bid count
+		if (bidsPlaced.length > 0) {
+			await trx('products')
+				.where({ id: productId })
+				.update({
+					current_price: runningPrice,
+					bid_count: runningBidCount,
+					updated_at: trx.fn.now(),
+				});
+
+			// Get final winner info
+			const finalWinner = bidsPlaced[bidsPlaced.length - 1];
+
+			return {
+				processed: true,
+				bidsPlaced,
+				outbidEvents,
+				finalPrice: runningPrice,
+				finalBidCount: runningBidCount,
+				autoBid: {
+					bidderId: finalWinner.bidderId,
+					bidderName: finalWinner.bidderName,
+					bidderEmail: finalWinner.bidderEmail,
+					amount: runningPrice,
+					bidCount: runningBidCount,
+				},
+				productTitle: latestProduct.title,
+			};
+		}
+
+		return { processed: false, reason: 'NO_BIDS_NEEDED' };
 	});
 }
 
@@ -719,7 +758,8 @@ async function getAutoBidsForProduct(productId) {
 			'ab.bidder_id',
 			'ab.max_price',
 			'ab.created_at',
-			'u.full_name as bidder_name'
+			'u.full_name as bidder_name',
+			'u.email as bidder_email'
 		)
 		.orderBy('ab.max_price', 'desc')
 		.orderBy('ab.created_at', 'asc');
@@ -729,6 +769,7 @@ async function getAutoBidsForProduct(productId) {
 		productId: row.product_id,
 		bidderId: row.bidder_id,
 		bidderName: row.bidder_name || `User #${row.bidder_id}`,
+		bidderEmail: row.bidder_email,
 		maxPrice: Number(row.max_price),
 		createdAt: row.created_at,
 	}));

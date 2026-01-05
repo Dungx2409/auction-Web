@@ -9,6 +9,74 @@ const mailer = require('../services/mailer');
 const PAGE_SIZE = 9;
 const CLOSED_STATUSES = new Set(['ended', 'draft', 'removed', 'cancelled', 'suspended']);
 
+/**
+ * Send email notifications for auto-bid events
+ * Only sends emails for important events:
+ * - Outbid: when a bidder is ultimately outbid (final result only, not every step)
+ * Does NOT spam seller for every auto-bid increment
+ * 
+ * @param {Object} params
+ * @param {Object} params.autoBidResult - Result from processAutoBids
+ * @param {Object} params.product - Product info (title, seller, etc.)
+ * @param {string} params.productUrl - URL to the product
+ * @param {Object} [params.originalBidder] - The bidder who triggered the auto-bid process
+ * @param {number} [params.originalBidAmount] - The amount of the original bid
+ */
+async function sendAutoBidEmails({ autoBidResult, product, productUrl, originalBidder, originalBidAmount }) {
+  if (!autoBidResult?.processed) return;
+
+  const { outbidEvents, finalPrice } = autoBidResult;
+  const finalWinnerId = autoBidResult.autoBid?.bidderId;
+
+  // 1. Send outbid notifications - only to the final losers (not every step)
+  // This is an important event - user needs to know they've been outbid
+  if (outbidEvents && outbidEvents.length > 0) {
+    // Find unique losers who are not the final winner
+    const uniqueLosers = new Map();
+    
+    for (const event of outbidEvents) {
+      // Only add if this bidder is not the final winner
+      if (String(event.bidderId) !== String(finalWinnerId) && event.bidderEmail) {
+        uniqueLosers.set(String(event.bidderId), event);
+      }
+    }
+
+    // Send outbid email to each unique loser
+    for (const [, loser] of uniqueLosers) {
+      mailer.sendOutbidNotificationEmail({
+        to: loser.bidderEmail,
+        previousBidderName: loser.bidderName,
+        productTitle: product.title,
+        productUrl,
+        newBidAmount: hbsHelpers.formatCurrency(finalPrice),
+        yourBidAmount: hbsHelpers.formatCurrency(loser.previousAmount),
+      }).catch((err) => {
+        console.error('[mailer] Không thể gửi email thông báo bị vượt giá (auto-bid):', err);
+      });
+    }
+  }
+
+  // 2. If the original bidder got outbid by auto-bids, notify them
+  // This is important - the person who just placed a bid needs to know they've been outbid
+  if (originalBidder?.email && 
+      originalBidder?.id && 
+      String(originalBidder.id) !== String(finalWinnerId)) {
+    mailer.sendOutbidNotificationEmail({
+      to: originalBidder.email,
+      previousBidderName: originalBidder.name,
+      productTitle: product.title,
+      productUrl,
+      newBidAmount: hbsHelpers.formatCurrency(finalPrice),
+      yourBidAmount: hbsHelpers.formatCurrency(originalBidAmount),
+    }).catch((err) => {
+      console.error('[mailer] Không thể gửi email thông báo bị vượt giá cho người đặt gốc:', err);
+    });
+  }
+
+  // NOTE: We intentionally do NOT notify seller for every auto-bid increment
+  // to avoid spam. Seller will receive summary when auction ends.
+}
+
 function computeAuctionState(product) {
   const normalizedStatus = String(product.status || 'active').toLowerCase();
   const endTime = product.endDate ? new Date(product.endDate) : null;
@@ -228,6 +296,65 @@ router.get('/:id', async (req, res, next) => {
     if (auctionClosed && (isWinner || isSellerOfProduct)) {
       const order = await dataService.ensureOrderForProduct(product, { chatLimit: 100 });
       if (order) {
+        // Send auction end notifications when order is first created
+        if (order.isNewOrder) {
+          const host = req.get('host') || 'localhost:3000';
+          const protocol = req.protocol || 'http';
+          const productUrl = `${protocol}://${host}/products/${product.id}`;
+          const finalPrice = hbsHelpers.formatCurrency(product.currentPrice);
+
+          // Send email to winner
+          if (product.highestBidder?.email) {
+            mailer.sendAuctionWonEmail({
+              to: product.highestBidder.email,
+              winnerName: product.highestBidder.name,
+              productTitle: product.title,
+              productUrl,
+              finalPrice,
+              sellerName: product.seller?.name,
+            }).catch((err) => {
+              console.error('[mailer] Không thể gửi email thông báo thắng đấu giá:', err);
+            });
+          }
+
+          // Send email to seller
+          if (product.seller?.email) {
+            mailer.sendAuctionEndedForSellerEmail({
+              to: product.seller.email,
+              sellerName: product.seller.name,
+              productTitle: product.title,
+              productUrl,
+              finalPrice,
+              winnerName: hbsHelpers.maskName(product.highestBidder?.name || 'Người thắng'),
+              bidCount: product.bidCount || 0,
+            }).catch((err) => {
+              console.error('[mailer] Không thể gửi email thông báo kết thúc đấu giá cho seller:', err);
+            });
+          }
+
+          // Send email to losers (bidders with auto-bid who didn't win)
+          // Note: We only have auto-bid info, not all bidders who manually bid
+          const autoBids = await dataService.getAutoBidsForProduct(product.id);
+          for (const autoBid of autoBids) {
+            if (String(autoBid.bidderId) !== String(highestBidderId)) {
+              // Get bidder email from the autoBid data
+              const bidderEmail = autoBid.bidderEmail;
+              if (bidderEmail) {
+                mailer.sendAuctionLostEmail({
+                  to: bidderEmail,
+                  bidderName: autoBid.bidderName,
+                  productTitle: product.title,
+                  productUrl: `${protocol}://${host}/search`,
+                  finalPrice,
+                  yourBidAmount: hbsHelpers.formatCurrency(autoBid.maxPrice),
+                }).catch((err) => {
+                  console.error('[mailer] Không thể gửi email thông báo thua đấu giá:', err);
+                });
+              }
+            }
+          }
+        }
+
         const workflow = dataService.getOrderWorkflowMetadata();
         const currentIndex = workflow.findIndex((step) => step.status === order.status);
         const steps = workflow.map((step, index) => ({
@@ -417,9 +544,10 @@ router.post('/:id/bids', async (req, res, next) => {
       amount,
     });
 
-    // Process auto-bids from other users
+    // Process auto-bids from other users and send notifications
+    let autoBidResult = null;
     try {
-      const autoBidResult = await dataService.processAutoBids({
+      autoBidResult = await dataService.processAutoBids({
         productId: rawProductId,
         currentBidAmount: amount,
         currentBidderId: user.id,
@@ -442,6 +570,19 @@ router.post('/:id/bids', async (req, res, next) => {
     const productUrl = `${protocol}://${host}/products/${rawProductId}`;
     const formattedAmount = hbsHelpers.formatCurrency(amount);
 
+    // Gửi email cho auto-bid events (outbid notifications, seller notification)
+    if (autoBidResult?.processed) {
+      sendAutoBidEmails({ 
+        autoBidResult, 
+        product, 
+        productUrl,
+        originalBidder: { id: user.id, name: user.name, email: user.email },
+        originalBidAmount: amount,
+      }).catch((err) => {
+        console.error('[auto-bid] Error sending auto-bid emails:', err);
+      });
+    }
+
     // 1. Gửi email cho người đặt giá (bidder) - xác nhận đặt giá thành công
     if (user.email) {
       mailer.sendBidSuccessEmail({
@@ -456,7 +597,9 @@ router.post('/:id/bids', async (req, res, next) => {
     }
 
     // 2. Gửi email cho người bán (seller) - thông báo có người đặt giá mới
-    if (product.seller?.email) {
+    // Chỉ gửi nếu không có auto-bid xảy ra (tránh gửi 2 email liên tiếp)
+    // Nếu có auto-bid, sendAutoBidEmails đã gửi email với kết quả cuối cùng
+    if (product.seller?.email && !autoBidResult?.processed) {
       mailer.sendBidNotificationToSeller({
         to: product.seller.email,
         sellerName: product.seller.name,
@@ -618,6 +761,11 @@ router.post('/:id/auto-bid', async (req, res, next) => {
       maxPrice,
     });
 
+    // Build product URL for emails
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol || 'http';
+    const productUrl = `${protocol}://${host}/products/${productId}`;
+
     // If user doesn't have the current highest bid, place an initial bid
     const isCurrentLeader = product.highestBidder?.id && String(product.highestBidder.id) === String(user.id);
     let initialBidPlaced = false;
@@ -629,6 +777,10 @@ router.post('/:id/auto-bid', async (req, res, next) => {
       
       if (initialBid <= maxPrice) {
         try {
+          // Store previous leader for outbid notification
+          const previousHighestBidder = product.highestBidder?.id ? { ...product.highestBidder } : null;
+          const previousBidAmount = product.currentPrice;
+
           await dataService.placeBid({
             productId,
             bidderId: user.id,
@@ -636,6 +788,35 @@ router.post('/:id/auto-bid', async (req, res, next) => {
           });
           initialBidPlaced = true;
           newBidAmount = initialBid;
+
+          // Send email to user confirming their initial bid
+          if (user.email) {
+            mailer.sendBidSuccessEmail({
+              to: user.email,
+              bidderName: user.name,
+              productTitle: product.title,
+              productUrl,
+              bidAmount: hbsHelpers.formatCurrency(initialBid),
+            }).catch((err) => {
+              console.error('[mailer] Không thể gửi email xác nhận đặt giá tự động:', err);
+            });
+          }
+
+          // Send outbid notification to previous leader (if any and different from current user)
+          if (previousHighestBidder?.id && 
+              String(previousHighestBidder.id) !== String(user.id) && 
+              previousHighestBidder.email) {
+            mailer.sendOutbidNotificationEmail({
+              to: previousHighestBidder.email,
+              previousBidderName: previousHighestBidder.name,
+              productTitle: product.title,
+              productUrl,
+              newBidAmount: hbsHelpers.formatCurrency(initialBid),
+              yourBidAmount: hbsHelpers.formatCurrency(previousBidAmount),
+            }).catch((err) => {
+              console.error('[mailer] Không thể gửi email thông báo bị vượt giá:', err);
+            });
+          }
 
           // Process other auto-bids in response
           const autoBidResult = await dataService.processAutoBids({
@@ -646,6 +827,32 @@ router.post('/:id/auto-bid', async (req, res, next) => {
 
           if (autoBidResult.processed && autoBidResult.autoBid) {
             newBidAmount = autoBidResult.autoBid.amount;
+            
+            // Send email notifications for auto-bid events
+            sendAutoBidEmails({ 
+              autoBidResult, 
+              product, 
+              productUrl,
+              originalBidder: { id: user.id, name: user.name, email: user.email },
+              originalBidAmount: initialBid,
+            }).catch((err) => {
+              console.error('[auto-bid] Error sending auto-bid emails:', err);
+            });
+          } else {
+            // No auto-bid occurred, send notification to seller about the initial bid
+            if (product.seller?.email) {
+              mailer.sendBidNotificationToSeller({
+                to: product.seller.email,
+                sellerName: product.seller.name,
+                productTitle: product.title,
+                productUrl,
+                bidderName: hbsHelpers.maskName(user.name),
+                bidAmount: hbsHelpers.formatCurrency(initialBid),
+                bidCount: (product.bidCount || 0) + 1,
+              }).catch((err) => {
+                console.error('[mailer] Không thể gửi email thông báo đặt giá tự động cho seller:', err);
+              });
+            }
           }
         } catch (bidError) {
           console.error('[auto-bid] Error placing initial bid:', bidError);
