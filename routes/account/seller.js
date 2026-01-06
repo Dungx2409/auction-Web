@@ -281,18 +281,28 @@ function validateProductInput(body = {}, files = []) {
 
 	const now = dayjs();
 	let startDate = null;
-	if (!formValues.startDate) {
-		errors.startDate = 'Vui lòng chọn thời gian bắt đầu.';
-	} else {
-		const parsed = dayjs(formValues.startDate);
-		if (!parsed.isValid()) {
-			errors.startDate = 'Thời gian bắt đầu không hợp lệ.';
+	// When editing, startDate is fixed and not required from form
+	if (!isEditing) {
+		if (!formValues.startDate) {
+			errors.startDate = 'Vui lòng chọn thời gian bắt đầu.';
 		} else {
+			const parsed = dayjs(formValues.startDate);
+			if (!parsed.isValid()) {
+				errors.startDate = 'Thời gian bắt đầu không hợp lệ.';
+			} else {
+				startDate = parsed;
+				formValues.startDate = parsed.format('YYYY-MM-DDTHH:mm');
+				if (startDate.isBefore(now.add(15, 'minute'))) {
+					errors.startDate = 'Thời gian bắt đầu phải sau thời điểm hiện tại ít nhất 15 phút.';
+				}
+			}
+		}
+	} else if (formValues.startDate) {
+		// For editing, just parse the startDate for display purposes but don't validate
+		const parsed = dayjs(formValues.startDate);
+		if (parsed.isValid()) {
 			startDate = parsed;
 			formValues.startDate = parsed.format('YYYY-MM-DDTHH:mm');
-			if (!isEditing && startDate.isBefore(now.add(15, 'minute'))) {
-				errors.startDate = 'Thời gian bắt đầu phải sau thời điểm hiện tại ít nhất 15 phút.';
-			}
 		}
 	}
 
@@ -484,13 +494,20 @@ router.post('/', handleProductUpload, async (req, res, next) => {
 		}
 
 		if (isEditing) {
-			// For editing, handle images if new ones are uploaded
-			let imageUrls = null;
+			// For editing, handle images if new ones are uploaded or new URLs provided
+			let newImageUrls = null;
+			
+			// Check for uploaded files
 			if (req.files && req.files.length > 0) {
-				imageUrls = await moveFilesToProductFolder(req.files, user.id, values.productId);
+				newImageUrls = await moveFilesToProductFolder(req.files, user.id, values.productId);
+			}
+			// Check for URL images from form (only if no files uploaded)
+			else if (values.imageUrls && values.imageUrls.length > 0) {
+				newImageUrls = values.imageUrls;
 			}
 			
-			await dataService.updateProduct({
+			// Build update payload - only include imageUrl if new images are provided
+			const updatePayload = {
 				productId: values.productId,
 				sellerId: user.id,
 				categoryId: values.categoryId,
@@ -500,12 +517,63 @@ router.post('/', handleProductUpload, async (req, res, next) => {
 				startPrice: values.startPrice,
 				stepPrice: values.stepPrice,
 				buyNowPrice: values.buyNowPrice,
-				startDate: values.startDate,
+				// startDate is not updated - it should remain fixed after product creation
 				endDate: values.endDate,
 				autoExtend: values.autoExtend,
-				imageUrl: imageUrls ? imageUrls[0] : undefined,
-				galleryUrls: imageUrls ? imageUrls.slice(1) : undefined,
-			});
+			};
+			
+			// Only include image fields if new images were provided
+			if (newImageUrls && newImageUrls.length > 0) {
+				updatePayload.imageUrl = newImageUrls[0];
+				updatePayload.galleryUrls = newImageUrls.slice(1);
+			}
+			
+			await dataService.updateProduct(updatePayload);
+
+			// Send email notification to watchers and bidders about the description update
+			const [watchers, bidders] = await Promise.all([
+				dataService.getWatchersForProduct(values.productId),
+				dataService.getBiddersForProduct(values.productId),
+			]);
+
+			// Merge watchers and bidders, removing duplicates by email
+			const recipientMap = new Map();
+			for (const watcher of watchers) {
+				if (watcher.email) {
+					recipientMap.set(watcher.email.toLowerCase(), watcher);
+				}
+			}
+			for (const bidder of bidders) {
+				if (bidder.email && !recipientMap.has(bidder.email.toLowerCase())) {
+					recipientMap.set(bidder.email.toLowerCase(), bidder);
+				}
+			}
+			const recipients = Array.from(recipientMap.values());
+
+			if (recipients.length > 0) {
+				const host = req.get('host') || 'localhost:3000';
+				const protocol = req.protocol || 'http';
+				const productUrl = `${protocol}://${host}/products/${values.productId}`;
+				const sellerName = user.full_name || user.fullName || user.name || 'Người bán';
+
+				// Send emails in parallel (non-blocking)
+				Promise.allSettled(
+					recipients.map((recipient) =>
+						mailer.sendProductDescriptionUpdateEmail({
+							to: recipient.email,
+							watcherName: recipient.name,
+							sellerName,
+							productTitle: values.title,
+							productUrl,
+						})
+					)
+				).then((results) => {
+					const sent = results.filter((r) => r.status === 'fulfilled' && r.value?.success).length;
+					console.info(`[mailer] Đã gửi ${sent}/${recipients.length} email thông báo cập nhật mô tả sản phẩm #${values.productId} (${watchers.length} watchers, ${bidders.length} bidders)`);
+				}).catch((err) => {
+					console.error('[mailer] Lỗi khi gửi email thông báo cập nhật mô tả:', err);
+				});
+			}
 		} else {
 			// Create product first to get the ID
 			const newProduct = await dataService.createProduct({

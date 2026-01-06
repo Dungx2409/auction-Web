@@ -36,6 +36,46 @@ async function countWatchersForProduct(productId) {
 	return Number(result?.count ?? result?.cnt ?? result?.total ?? 0);
 }
 
+/**
+ * Get all watchers (with user details) for a product
+ * Used to notify watchers when product description changes
+ */
+async function getWatchersForProduct(productId) {
+	if (!productId) return [];
+	const db = getKnex();
+	const rows = await db('watchlists as w')
+		.innerJoin('users as u', 'u.id', 'w.user_id')
+		.select('u.id', 'u.full_name as name', 'u.email')
+		.where('w.product_id', productId)
+		.whereNotNull('u.email');
+	return rows.map((row) => ({
+		id: row.id,
+		name: row.name || `User #${row.id}`,
+		email: row.email,
+	}));
+}
+
+/**
+ * Get all bidders (with user details) who have placed bids on a product
+ * Used to notify bidders when product description changes
+ */
+async function getBiddersForProduct(productId) {
+	if (!productId) return [];
+	const db = getKnex();
+	// Get distinct bidders who have placed bids on this product
+	const rows = await db('bids as b')
+		.innerJoin('users as u', 'u.id', 'b.bidder_id')
+		.select('u.id', 'u.full_name as name', 'u.email')
+		.where('b.product_id', productId)
+		.whereNotNull('u.email')
+		.groupBy('u.id', 'u.full_name', 'u.email');
+	return rows.map((row) => ({
+		id: row.id,
+		name: row.name || `User #${row.id}`,
+		email: row.email,
+	}));
+}
+
 async function addToWatchlist(userId, productId) {
 	if (!userId || !productId) return { isWatching: false, watchers: 0 };
 	const db = getKnex();
@@ -781,6 +821,8 @@ module.exports = {
 	addToWatchlist,
 	removeFromWatchlist,
 	countWatchersForProduct,
+	getWatchersForProduct,
+	getBiddersForProduct,
 	placeBid,
 	getBidRequest,
 	getBidRequestsBySeller,

@@ -71,8 +71,12 @@
 
                   <div class="form-field {{#if seller.productErrors.startDate}}has-error{{/if}}">
                     <label for="product-start-date">Bắt đầu</label>
-                    <input id="product-start-date" type="datetime-local" name="startDate" value="{{seller.productForm.startDate}}" required />
-                    <p class="field-hint">Chọn thời điểm ít nhất sau hiện tại 15 phút để người mua chuẩn bị.</p>
+                    <input id="product-start-date" type="datetime-local" name="startDate" value="{{seller.productForm.startDate}}" {{#if seller.editingProductId}}readonly{{else}}required{{/if}} />
+                    {{#if seller.editingProductId}}
+                      <p class="field-hint">Thời gian bắt đầu không thể thay đổi sau khi tạo sản phẩm.</p>
+                    {{else}}
+                      <p class="field-hint">Chọn thời điểm ít nhất sau hiện tại 15 phút để người mua chuẩn bị.</p>
+                    {{/if}}
                     {{#if seller.productErrors.startDate}}<span class="field-error">{{seller.productErrors.startDate}}</span>{{/if}}
                   </div>
 

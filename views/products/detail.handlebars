@@ -83,6 +83,9 @@
   </div>
   <div class="info">
     <h1>{{product.title}}</h1>
+    {{#if product.summary}}
+    <p class="product-summary">{{product.summary}}</p>
+    {{/if}}
     <div class="price-block">
       <span class="price-current">{{formatCurrency product.currentPrice}}</span>
       {{#if product.buyNowPrice}}

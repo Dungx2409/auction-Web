@@ -176,13 +176,20 @@ async function hydrateProducts(rows) {
 		watcherMap.set(item.product_id, Number(item.count));
 	});
 
+	// Get highest bid for each product, excluding rejected bidders
 	const latestBidRows = await db
 		.select('b.product_id', 'b.bid_price', 'b.bidder_id', 'u.full_name as bidder_name', 'u.email as bidder_email', 'u.rating_pos', 'u.rating_neg')
 		.from('bids as b')
 		.leftJoin('users as u', 'u.id', 'b.bidder_id')
 		.whereIn('b.product_id', productIds)
+		.whereNotExists(function () {
+			this.select(1)
+				.from('bid_rejections as br')
+				.whereRaw('br.product_id = b.product_id AND br.bidder_id = b.bidder_id');
+		})
 		.orderBy('b.product_id', 'asc')
-		.orderBy('b.created_at', 'desc');
+		.orderBy('b.bid_price', 'desc')
+		.orderBy('b.created_at', 'asc');
 
 	const latestBidMap = new Map();
 	latestBidRows.forEach((row) => {
@@ -417,7 +424,7 @@ async function getProductsByBidder(bidderId) {
 		.whereIn('p.id', productIds)
 		.orderBy('p.end_time', 'asc');
 
-	// Get my max bid per product and the overall highest bid per product
+	// Get my max bid per product and the overall highest bid per product (excluding rejected bidders)
 	const [products, myBidRows, highestBidRows] = await Promise.all([
 		hydrateProducts(productsRows),
 		db('bids as b')
@@ -428,6 +435,11 @@ async function getProductsByBidder(bidderId) {
 			.groupBy('b.product_id'),
 		db('bids as b')
 			.whereIn('b.product_id', productIds)
+			.whereNotExists(function () {
+				this.select(1)
+					.from('bid_rejections as br')
+					.whereRaw('br.product_id = b.product_id AND br.bidder_id = b.bidder_id');
+			})
 			.select('b.product_id')
 			.max({ highestBid: 'b.bid_price' })
 			.groupBy('b.product_id'),
@@ -854,9 +866,12 @@ async function updateProduct(payload) {
 		startDate,
 		endDate,
 		autoExtend = true,
-		imageUrl = null,
-		galleryUrls = [],
 	} = payload;
+	
+	// Check if imageUrl was explicitly provided in payload (even as null)
+	const hasImageUrl = 'imageUrl' in payload;
+	const imageUrl = payload.imageUrl ?? null;
+	const galleryUrls = payload.galleryUrls ?? [];
 
 	if (!productId || !sellerId) {
 		throw new Error('Missing productId or sellerId when updating product');
@@ -875,61 +890,73 @@ async function updateProduct(payload) {
 
 		const nextCurrentPrice = Number(existing.bid_count || 0) > 0 ? existing.current_price : startPrice;
 
+		const updateData = {
+			category_id: categoryId,
+			title,
+			short_description: shortDescription,
+			full_description: fullDescription,
+			start_price: startPrice,
+			current_price: nextCurrentPrice,
+			step_price: stepPrice,
+			buy_now_price: buyNowPrice,
+			auto_extend: autoExtend,
+			end_time: endDate,
+			updated_at: trx.fn.now(),
+		};
+		
+		// Only update start_time if explicitly provided (should not change after creation)
+		if (startDate !== undefined) {
+			updateData.start_time = startDate;
+		}
+
 		await trx('products')
 			.where({ id: productId })
-			.update({
-				category_id: categoryId,
-				title,
-				short_description: shortDescription,
-				full_description: fullDescription,
-				start_price: startPrice,
-				current_price: nextCurrentPrice,
-				step_price: stepPrice,
-				buy_now_price: buyNowPrice,
-				auto_extend: autoExtend,
-				start_time: startDate,
-				end_time: endDate,
-				updated_at: trx.fn.now(),
+			.update(updateData);
+
+		// Only update images if imageUrl was explicitly provided in payload
+		// When imageUrl key is not in payload, it means no image changes were made
+		const shouldUpdateImages = hasImageUrl;
+		
+		if (shouldUpdateImages) {
+			await trx('product_images').where({ product_id: productId }).del();
+
+			const imagesToInsert = [];
+			if (imageUrl) {
+				imagesToInsert.push({
+					product_id: productId,
+					image_url: imageUrl,
+					alt_text: title,
+					is_thumbnail: true,
+					position: 1,
+					created_at: trx.fn.now(),
+				});
+			}
+
+			normalizedGalleryUrls.forEach((url, index) => {
+				imagesToInsert.push({
+					product_id: productId,
+					image_url: url,
+					alt_text: `${title} - image ${index + 1}`,
+					is_thumbnail: !imageUrl && index === 0,
+					position: imageUrl ? index + 2 : index + 1,
+					created_at: trx.fn.now(),
+				});
 			});
 
-		await trx('product_images').where({ product_id: productId }).del();
+			if (!imageUrl && imagesToInsert.length === 0) {
+				imagesToInsert.push({
+					product_id: productId,
+					image_url: DEFAULT_IMAGE,
+					alt_text: title,
+					is_thumbnail: true,
+					position: 1,
+					created_at: trx.fn.now(),
+				});
+			}
 
-		const imagesToInsert = [];
-		if (imageUrl) {
-			imagesToInsert.push({
-				product_id: productId,
-				image_url: imageUrl,
-				alt_text: title,
-				is_thumbnail: true,
-				position: 1,
-				created_at: trx.fn.now(),
-			});
-		}
-
-		normalizedGalleryUrls.forEach((url, index) => {
-			imagesToInsert.push({
-				product_id: productId,
-				image_url: url,
-				alt_text: `${title} - image ${index + 1}`,
-				is_thumbnail: !imageUrl && index === 0,
-				position: imageUrl ? index + 2 : index + 1,
-				created_at: trx.fn.now(),
-			});
-		});
-
-		if (!imageUrl && imagesToInsert.length === 0) {
-			imagesToInsert.push({
-				product_id: productId,
-				image_url: DEFAULT_IMAGE,
-				alt_text: title,
-				is_thumbnail: true,
-				position: 1,
-				created_at: trx.fn.now(),
-			});
-		}
-
-		if (imagesToInsert.length) {
-			await trx('product_images').insert(imagesToInsert);
+			if (imagesToInsert.length) {
+				await trx('product_images').insert(imagesToInsert);
+			}
 		}
 	});
 

@@ -664,6 +664,57 @@ async function sendAuctionEndedForSellerEmail({ to, sellerName, productTitle, pr
   return { success: true };
 }
 
+// ========== PRODUCT DESCRIPTION UPDATE NOTIFICATION FOR WATCHERS ==========
+
+function buildProductDescriptionUpdateEmail({ watcherName, sellerName, productTitle, productUrl }) {
+  const safeWatcher = escapeHtml(watcherName || 'bạn');
+  const safeSeller = escapeHtml(sellerName || 'Người bán');
+  const safeProduct = escapeHtml(productTitle || 'Sản phẩm');
+  const link = productUrl || '#';
+
+  return {
+    subject: `Sản phẩm "${productTitle}" vừa được cập nhật mô tả`,
+    text: `Xin chào ${watcherName},\n\n${sellerName} vừa cập nhật mô tả cho sản phẩm "${productTitle}" mà bạn đang theo dõi.\n\nHãy xem thông tin mới ngay: ${link}\n\nTrân trọng,\nĐội ngũ Auction Web`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #0f62fe;">📝 Cập nhật mô tả sản phẩm</h2>
+        <p>Xin chào <strong>${safeWatcher}</strong>,</p>
+        <p><strong>${safeSeller}</strong> vừa cập nhật mô tả cho sản phẩm <em>${safeProduct}</em> mà bạn đang theo dõi.</p>
+        <p>Hãy xem ngay để nắm bắt thông tin mới nhất!</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 24px;border-radius:999px;background:#0f62fe;color:#fff;text-decoration:none;font-weight:bold;">
+            Xem sản phẩm
+          </a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e6ef; margin: 24px 0;">
+        <p style="color: #666; font-size: 13px;">Trân trọng,<br/><strong>Đội ngũ Auction Web</strong></p>
+      </div>
+    `,
+  };
+}
+
+async function sendProductDescriptionUpdateEmail({ to, watcherName, sellerName, productTitle, productUrl }) {
+  if (!to) return { success: false, skipped: true };
+
+  if (!isMailerConfigured()) {
+    console.info('[mailer] SMTP chưa cấu hình, bỏ qua gửi email thông báo cập nhật mô tả cho %s.', to);
+    return { success: false, skipped: true };
+  }
+
+  const emailContent = buildProductDescriptionUpdateEmail({ watcherName, sellerName, productTitle, productUrl });
+  const mailTransport = getTransporter();
+
+  await mailTransport.sendMail({
+    from: `${config.mailer.fromName} <${config.mailer.fromAddress}>`,
+    to,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+
+  return { success: true };
+}
+
 module.exports = {
   isMailerConfigured,
   sendOtpEmail,
@@ -679,4 +730,6 @@ module.exports = {
   sendAuctionWonEmail,
   sendAuctionLostEmail,
   sendAuctionEndedForSellerEmail,
+  // Product update notification
+  sendProductDescriptionUpdateEmail,
 };

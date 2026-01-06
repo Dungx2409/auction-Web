@@ -3876,7 +3876,8 @@ function setupFormValidation() {
     } else if (field.type === 'url') {
       error = validators.url(value);
     } else if (field.type === 'datetime-local') {
-      if (name === 'startDate') {
+      if (name === 'startDate' && !field.readOnly) {
+        // Only validate futureDate if field is not readonly (not editing mode)
         error = validators.futureDate(value);
       } else if (name === 'endDate') {
         error = validators.dateAfter(value, form, 'startDate');

@@ -1454,6 +1454,13 @@ main.container {
 	box-shadow: 0 12px 32px rgba(31, 37, 50, 0.08);
 }
 
+.product-summary {
+	color: var(--muted);
+	font-size: 1rem;
+	line-height: 1.6;
+	margin-bottom: 8px;
+}
+
 .price-block {
 	display: flex;
 	gap: 16px;
